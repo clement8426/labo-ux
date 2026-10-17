@@ -1,0 +1,62 @@
+{
+  "name": "labo-ux",
+  "version": "0.1.0",
+  "description": "Kit modulaire d’audit UX : moteur, CLI et MCP local",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "packages/adapters/*"
+  ],
+  "bin": {
+    "labo-ux": "dist/packages/cli/src/index.js",
+    "labo-ux-mcp": "dist/packages/mcp-server/src/index.js"
+  },
+  "files": [
+    "dist/packages",
+    "skills",
+    "docs",
+    "scripts/package-plugins.mjs",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint packages tests scripts",
+    "test": "npm run build && vitest run",
+    "plugins:build": "node scripts/package-plugins.mjs",
+    "plugins:check": "node scripts/package-plugins.mjs --check",
+    "check": "npm run typecheck && npm run lint && npm test && npm run plugins:check",
+    "prepack": "npm run build",
+    "demo": "node dist/packages/cli/src/index.js run --config fixtures/web-showcase/audit.json"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "commander": "14.0.2",
+    "zod": "4.6.7"
+  },
+  "optionalDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "playwright": "1.64.1",
+    "lighthouse": "13.5.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "5.9.3",
+    "playwright-core": "1.64.1",
+    "vitest": "5.0.5",
+    "eslint": "^9.0.0",
+    "typescript-eslint": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/clement8426/labo-ux.git"
+  },
+  "bugs": {
+    "url": "https://github.com/clement8426/labo-ux/issues"
+  }
+}

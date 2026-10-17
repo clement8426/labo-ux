@@ -1,0 +1,7 @@
+<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Atelier fictif — démonstration UX</title>
+<style>body{font:18px/1.5 system-ui;margin:40px auto;max-width:800px;padding:20px;color:#223c45;background:#f6f7f4}button{padding:12px 20px;background:#236b64;color:white;border:0;border-radius:6px}input{display:block;padding:12px;font:inherit}label{display:block;margin:12px 0}header{border-bottom:2px solid #236b64}img{width:48px;height:48px}</style>
+<header><h1>L’atelier des projets</h1><p>Un site fictif pour apprendre à auditer les interfaces.</p></header>
+<main><h2>Contacter l’atelier</h2><img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48'%3E%3Crect fill='%23236b64' width='48' height='48'/%3E%3C/svg%3E">
+<form id="contact"><label for="email">Adresse e-mail fictive</label><input id="email" name="email" type="email" required autocomplete="email" data-testid="email"><button type="submit">Cliquez ici</button><p role="status" data-testid="confirmation"></p></form>
+<p id="vague">Une erreur est survenue</p></main>
+<script>const clean=new URLSearchParams(location.search).has('clean');if(clean){document.querySelector('img').alt='';document.querySelector('button').textContent='Envoyer la demande';document.querySelector('#vague').remove()}document.querySelector('form').addEventListener('submit',event=>{event.preventDefault();document.querySelector('[role=status]').textContent='Votre demande fictive a été enregistrée.'});</script></html>

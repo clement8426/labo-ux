@@ -1,0 +1,27 @@
+#!/usr/bin/env node
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { PlanSchema } from '../../contracts/src/index.js';
+import { checks, prepare, normalizePlan, Store, AuditService, readReport, compareReports } from '../../core/src/service.js';
+import { readSnapshot } from '../../adapters/source/src/index.js';
+import { discoverTargets } from '../../project-discovery/src/index.js';
+const server = new McpServer({ name: 'labo-ux', version: '0.1.0' }), service = new AuditService();
+const text = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data) }] });
+const saved = { runId: z.string(), outputDir: z.string().default('.labo-ux') };
+const withPlan = { plan: PlanSchema };
+server.registerTool('inspect_project', { description: 'Inspecter un dossier local accessible ; une URL seule ne suffit pas.', inputSchema: { root: z.string() } }, async ({ root }) => { const snapshot = await readSnapshot(root); return text({ targets: discoverTargets(snapshot), limitations: snapshot.limitations }); });
+server.registerTool('list_targets', { description: 'Lister les cibles d’un plan.', inputSchema: withPlan }, async ({ plan }) => text(plan.targets));
+server.registerTool('check_capabilities', { description: 'Vérifier les capacités réellement disponibles par cible.', inputSchema: withPlan }, async ({ plan }) => text((await prepare(normalizePlan(plan, process.cwd()), checks)).capabilities));
+server.registerTool('validate_audit_plan', { description: 'Valider le plan et afficher la couverture prévue sans lancer de contrôle dynamique.', inputSchema: withPlan }, async ({ plan }) => { const p = normalizePlan(plan, process.cwd()), result = await prepare(p, checks); return text({ valid: true, confirmed: p.confirmed, coverage: result.coverage, limitations: result.snapshot.limitations }); });
+server.registerTool('list_checks', { description: 'Lister les contrôles, contrats, prérequis et versions.', inputSchema: {} }, async () => text(checks.map(({ run: _r, inputSchema: _i, outputSchema: _o, ...c }) => c)));
+server.registerTool('start_audit', { description: 'Lancer le plan confirmé et retourner immédiatement son identifiant. Ne pas confirmer un plan à la place du propriétaire.', inputSchema: withPlan }, async ({ plan }) => text(await service.start(normalizePlan(plan, process.cwd()))));
+server.registerTool('get_audit_status', { description: 'Lire la progression persistée sans attendre la fin de l’audit.', inputSchema: saved }, async ({ runId, outputDir }) => { const report = await readReport(new Store(outputDir), runId); return text({ state: report.state, completedNodes: report.results.length, statuses: report.results.map(r => ({ targetId: r.targetId, nodeId: r.nodeId, status: r.executionStatus })), limitations: report.limitations }); });
+server.registerTool('get_audit_results', { description: 'Lire les résultats filtrés. Les preuves binaires sont récupérables séparément.', inputSchema: { ...saved, targetId: z.string().optional(), block: z.string().optional(), nodeId: z.string().optional(), offset: z.number().int().nonnegative().default(0), limit: z.number().int().min(1).max(100).default(30) } }, async ({ runId, outputDir, targetId, block, nodeId, offset, limit }) => { const report = await readReport(new Store(outputDir), runId); const results = report.results.filter(r => (!targetId || r.targetId === targetId) && (!block || r.block === block) && (!nodeId || r.nodeId === nodeId)); return text({ results: results.slice(offset, offset + limit), total: results.length, limitations: report.limitations }); });
+server.registerTool('get_audit_evidence', { description: 'Lire un fichier de preuve dans le dossier evidence de cet audit (limite 5 Mo).', inputSchema: { ...saved, artifact: z.string() } }, async ({ runId, outputDir, artifact }) => { const data = await new Store(outputDir).evidence(runId, artifact); if (data.length > 5_000_000) throw new Error('Preuve trop volumineuse : consulter le fichier local'); return text({ artifact, encoding: 'base64', data: data.toString('base64') }); });
+server.registerTool('cancel_audit', { description: 'Annuler un audit lancé par ce processus, en conservant les résultats.', inputSchema: { runId: z.string() } }, async ({ runId }) => text(await service.cancel(runId)));
+server.registerTool('compare_audits', { description: 'Comparer les résultats par cible et contexte, sans score universel.', inputSchema: { before: z.string(), after: z.string(), outputDir: z.string().default('.labo-ux') } }, async ({ before, after, outputDir }) => { const store = new Store(outputDir); return text(compareReports(await readReport(store, before), await readReport(store, after))); });
+const shutdown = async () => { await service.shutdown(); await server.close(); process.exit(0); };
+process.once('SIGINT', shutdown); process.once('SIGTERM', shutdown);
+process.stdin.once('end', shutdown);
+server.connect(new StdioServerTransport()).catch(error => { process.stderr.write(String(error) + '\n'); process.exitCode = 1; });

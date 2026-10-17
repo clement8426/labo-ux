@@ -1,0 +1,13 @@
+.labo-ux/
+coverage/
+*.tgz
+plugins/*/engine/
+plugins/*/skills/
+plugins/*/.mcp.json
+.expo/
+node_modules/
+dist/
+*.log
+.env
+.env.*
+!.env.example

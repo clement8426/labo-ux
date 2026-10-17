@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1",
+  "projectRoot": ".",
+  "usage": "showcase",
+  "objective": "Envoyer une demande de contact avec des données fictives",
+  "confirmed": true,
+  "targets": [{ "id": "showcase-web", "kind": "web", "root": ".", "technology": ["html"], "baseUrl": "http://127.0.0.1:4178", "buildProfile": "release", "platformMetadata": { "appVersion": "fixture-1", "network": "loopback" } }],
+  "permissions": { "runtime": true, "dataMutation": true },
+  "behavior": { "file": "events.json", "steps": ["visit", "contact_open", "contact_sent"], "windowMs": 1800000 },
+  "journeys": [{ "id": "contact", "name": "Envoyer une demande fictive", "targetId": "showcase-web", "preconditions": ["Fixture démarrée sur le port 4178, aucune donnée réelle"], "expectedOutcome": "La confirmation de la demande est visible", "mutatesData": true,
+    "steps": [{ "action": "open-target" }, { "action": "enter-text", "locator": { "testId": "email" }, "value": "personne@example.test" }, { "action": "activate", "locator": { "role": "button", "name": "Cliquez ici" } }, { "action": "expect-text", "locator": { "testId": "confirmation" }, "expected": "Votre demande fictive" }, { "action": "checkpoint" }] }],
+  "timeoutMs": 120000,
+  "outputDir": "../../.labo-ux/demo"
+}

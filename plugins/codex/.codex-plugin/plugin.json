@@ -1,0 +1,7 @@
+{
+  "name": "labo-ux",
+  "version": "0.1.0",
+  "description": "Audit UX modulaire avec couverture explicite",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json"
+}

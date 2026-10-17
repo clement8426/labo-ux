@@ -1,0 +1,7 @@
+[
+  { "id": "a1", "userId": "alice-fictive", "sessionId": "s1", "name": "visit", "timestamp": "2026-10-01T10:00:00Z", "platform": "web" },
+  { "id": "a2", "userId": "alice-fictive", "sessionId": "s1", "name": "contact_open", "timestamp": "2026-10-01T10:01:00Z", "platform": "web" },
+  { "id": "a3", "userId": "alice-fictive", "sessionId": "s1", "name": "contact_sent", "timestamp": "2026-10-01T10:02:00Z", "platform": "web" },
+  { "id": "b1", "userId": "bob-fictif", "sessionId": "s2", "name": "visit", "timestamp": "2026-10-01T11:00:00Z", "platform": "web" },
+  { "id": "b2", "userId": "bob-fictif", "sessionId": "s2", "name": "contact_open", "timestamp": "2026-10-01T11:01:00Z", "platform": "web" }
+]
