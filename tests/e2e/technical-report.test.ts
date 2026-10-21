@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest';
 import { createServer } from 'node:http';
-import { access, mkdtemp, writeFile, readFile, rm } from 'node:fs/promises';
+import { access, mkdtemp, writeFile, readFile, rm, realpath } from 'node:fs/promises';
 import { join, resolve, relative, isAbsolute } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFile } from 'node:child_process';
@@ -37,7 +37,7 @@ it.skipIf(!available)('mesure réseau/cache/mémoire et indicateurs passifs, pui
     expect(pdf.status).toBe(200); expect(pdf.headers.get('content-type')).toBe('application/pdf'); expect(bytes.subarray(0, 5).toString()).toBe('%PDF-'); expect(bytes.length).toBeGreaterThan(15000);
     expect((await fetch(`${reportUrl}/run.json`)).status).toBe(404);
     const cliPdf = await promisify(execFile)(process.execPath, [resolve('dist/packages/cli/src/index.js'), 'export-pdf', state.id, '--output', outputDir, '--client', 'Agence fictive'], { timeout: 30000 });
-    expect(JSON.parse(cliPdf.stdout).pdf).toBe(join(directory, 'client.pdf'));
+    expect(JSON.parse(cliPdf.stdout).pdf).toBe(await realpath(join(directory, 'client.pdf')));
     expect(await readFile(join(directory, 'client.html'), 'utf8')).toContain('Agence fictive');
     expect((await fetch(`${reportUrl}/client.pdf`)).status).toBe(200);
     expect(await readFile(join(directory, 'client.html'), 'utf8')).toContain('Agence fictive');
