@@ -1,7 +1,7 @@
 # Labo UX
 
 Kit d’audit UX modulaire en TypeScript, avec CLI, serveur MCP local et skill commun
-aux distributions locales Codex et Claude. Version **0.3.0** : diagnostics navigateur,
+aux distributions locales Codex et Claude. Version **0.3.1** : diagnostics navigateur,
 rapport Lighthouse illustré et PDF client, en plus des modes audit/débogage et de
 l’installation guidée par l’agent. Le plan complet n’est pas encore
 livré ; voir [l’état des lots](docs/roadmap.md) et [la compatibilité](docs/compatibility.md).
@@ -275,3 +275,9 @@ tests manuels et ne promettent pas de retrouver tous les défauts UX.
 
 Documentation : [architecture](docs/architecture.md), [compatibilité](docs/compatibility.md),
 [lots restants](docs/roadmap.md), [format des parcours et événements](docs/formats.md).
+
+## Cohérence des composants (0.3.1)
+
+Le contrôle des styles compare les boutons, liens d’action et espacements des composants répétés, à deux largeurs par défaut. Les différences observées apparaissent dans le rapport et le plan de correction, avec leurs sélecteurs, valeurs et captures. Les variantes intentionnelles restent à confirmer. Voir [le périmètre et les groupes entre pages](skills/ux-audit/references/design-consistency.md).
+
+Le bilan de débogage expose les écarts restants et une conclusion explicite sur la couverture. Une exécution terminée ne signifie pas que tout le produit est corrigé.

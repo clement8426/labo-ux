@@ -50,6 +50,16 @@ résultats par cible/bloc. Lire les preuves utiles séparément. Une erreur ou u
 contrôle ignoré ne doit pas interrompre l’interprétation des autres résultats.
 Les fichiers de parcours décrivent des actions déclaratives, jamais du code arbitraire.
 
+Pour la cohérence, `design.collect-styles` compare les actions et espacements de
+composants répétés, boutons et liens inclus. Il produit des écarts avec sélecteurs,
+valeurs CSS et captures à 1280 et 375 px par défaut. Lire ces preuves et confirmer
+l’équivalence de fonction et l’intention graphique avant de modifier. Un écart
+est une hypothèse de défaut UX, pas une consigne d’uniformiser tout le site.
+Pour d’autres écrans ou des actions homologues entre pages, préparer `design.pages`,
+`design.viewports` et `design.groups` : voir [le périmètre de comparaison](references/design-consistency.md).
+Un état ouvert par un parcours n’est pas rejoué par ce contrôle ; annoncer cette
+limite et compléter l’observation. Sans famille comparable, ne pas valider le bloc.
+
 La section `technical` complète les six blocs UX quand elle est sélectionnée :
 réseau/cache sur deux chargements, mémoire ponctuelle, en-têtes/erreurs navigateur
 et indices de cache dans les sources. Ne pas déduire une fuite mémoire, un cache
@@ -82,6 +92,9 @@ En mode débogage, attendre la fin de l’audit initial puis appeler
 `get_debugging_plan` (CLI : `debug-plan <runId>`). Lire les preuves avant de corriger ;
 vérifier d’abord les hypothèses. Utiliser ensuite les outils d’édition propres à
 l’agent hôte dans le périmètre autorisé. Conserver les changements préexistants.
+Inclure les écarts de cohérence confirmés dans les corrections, pas seulement les
+alertes axe, Lighthouse ou les textes. Harmoniser les composants de même fonction
+avec des styles communs et vérifier les espacements dans le rendu.
 Ne pas modifier les assertions, parcours ou données de référence pour obtenir un
 rapport favorable. Reconstruire/redémarrer le projet si nécessaire et exécuter
 les tests adaptés, puis lancer un nouvel audit avec le même protocole.
@@ -94,3 +107,7 @@ d’outils. Si aucune source n’a changé, utiliser une comparaison simple et n
 annoncer de réécriture. Si un contrôle manque ou devient non comparable, ne pas
 présenter son défaut comme corrigé. Ne jamais conclure « tout est corrigé » sur
 la seule base de l’exécution du workflow.
+Lire `completionStatus` et `designVerification` dans le bilan : des différences
+restantes, une couverture réduite ou une comparaison impossible interdisent de
+présenter la cohérence comme vérifiée. Même sans écart détecté, la conclusion
+porte uniquement sur les groupes, écrans et largeurs réellement comparés.

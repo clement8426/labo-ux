@@ -10,7 +10,7 @@ function finished(state: RunState) {
   if (!['completed', 'partial'].includes(state.status) || !state.endedAt) throw new Error('Un audit terminé est obligatoire avant de préparer ou vérifier des corrections.');
 }
 function protocol(plan: Plan) {
-  return JSON.stringify({ projectRoot: resolve(plan.projectRoot), source: plan.source, objective: plan.objective, usage: plan.usage, targets: plan.targets, blocks: plan.blocks, checks: plan.checks, journeys: plan.journeys, behavior: plan.behavior,
+  return JSON.stringify({ projectRoot: resolve(plan.projectRoot), source: plan.source, objective: plan.objective, usage: plan.usage, targets: plan.targets, blocks: plan.blocks, checks: plan.checks, journeys: plan.journeys, behavior: plan.behavior, design: plan.design,
     permissions: { runtime: plan.permissions.runtime, dataMutation: plan.permissions.dataMutation } });
 }
 export async function debuggingPlan(store: Store, runId: string) {
@@ -26,7 +26,8 @@ export async function debuggingPlan(store: Store, runId: string) {
       'Conserver l’audit initial. Respecter les changements existants ; produire des modifications limitées et réversibles.',
       'Ne pas modifier les parcours, assertions, contrôles ou données de référence pour faire disparaître les défauts.',
       'Après les corrections, reconstruire/redémarrer si nécessaire, lancer les tests adaptés et créer un nouvel audit avec le même protocole.',
-      'Appeler finish_debugging avec les deux identifiants et la liste réelle des fichiers modifiés. Un constat absent d’un contrôle non comparable n’est pas une correction prouvée.'],
+      'Pour la cohérence, lire les captures et valeurs des groupes homologues, confirmer l’intention, puis harmoniser les composants concernés. Vérifier boutons, liens d’action et espacements ; un inventaire sans analyse ne suffit pas.',
+      'Appeler finish_debugging avec les deux identifiants et la liste réelle des fichiers modifiés. Un constat absent d’un contrôle non comparable n’est pas une correction prouvée. Lire completionStatus et designVerification avant de conclure.'],
     findings: results.flatMap(r => r.findings.map(f => ({ targetId: r.targetId, nodeId: r.nodeId, ...f, evidence: r.evidence.filter(e => f.evidenceIds.includes(e.id)) }))),
     limitations: [...report.limitations, ...results.flatMap(r => r.limitations)]
   };
@@ -47,15 +48,29 @@ export async function finishDebugging(store: Store, beforeId: string, afterId: s
   if (protocol(before.state.plan) !== protocol(after.state.plan)) throw new Error('Le protocole a changé : cibles, parcours, contrôles, données ou permissions de test différents. Les corrections ne peuvent pas être validées par ce workflow.');
   if (before.state.fingerprint === after.state.fingerprint) throw new Error('Les sources auditées sont identiques : aucune réécriture du projet n’est vérifiée. Utiliser compare_audits pour une simple comparaison sans correction.');
   const comparison = compareReports(before, after);
+  const unresolvedFindings = after.results.flatMap(r => r.findings.map(f => ({ targetId: r.targetId, nodeId: r.nodeId, ...f })));
+  const toolFailures = after.results.filter(r => ['error', 'timed-out', 'cancelled', 'skipped'].includes(r.executionStatus)).map(r => ({ nodeId: r.nodeId, targetId: r.targetId, status: r.executionStatus }));
+  const designChecks = before.results.filter(r => r.nodeId === 'design.collect-styles');
+  const designComparisons = comparison.filter(r => r.nodeId === 'design.collect-styles');
+  const pendingDesign = unresolvedFindings.filter(f => f.nodeId === 'design.collect-styles');
+  const designCoverageChanged = designChecks.some(old => {
+    const current = after.results.find(r => r.nodeId === old.nodeId && r.targetId === old.targetId);
+    return ['design.views', 'design.compared-action-groups', 'design.compared-spacing-groups'].some(name => old.measurements.find(m => m.name === name)?.value !== current?.measurements.find(m => m.name === name)?.value);
+  });
+  const designVerification = {
+    status: !designChecks.length ? 'not-covered' : pendingDesign.length ? 'differences-remain' : !designComparisons.length || designComparisons.some(c => !c.comparable) || designCoverageChanged ? 'verification-incomplete' : 'no-differences-detected-in-scope',
+    remaining: pendingDesign.length, coverageChanged: designCoverageChanged,
+    note: 'Les différences intentionnelles demandent une justification humaine. Aucun écart détecté ne valide pas le design system entier ; contrôler les groupes, pages et largeurs réellement observés.'
+  };
+  const completionStatus = unresolvedFindings.length ? 'corrections-incomplete' : toolFailures.length || comparison.some(c => !c.comparable) || designVerification.status === 'verification-incomplete' ? 'verification-incomplete' : 'no-remaining-detected-findings';
   const result = {
-    before: beforeId, after: afterId, phase: 'verification-completed', codeChanges: 'déclarées par l’agent hôte, non appliquées par le moteur', changes,
-    comparison, unresolvedFindings: after.results.flatMap(r => r.findings.map(f => ({ targetId: r.targetId, nodeId: r.nodeId, ...f }))),
-    toolFailures: after.results.filter(r => ['error', 'timed-out', 'cancelled', 'skipped'].includes(r.executionStatus)).map(r => ({ nodeId: r.nodeId, targetId: r.targetId, status: r.executionStatus })),
+    before: beforeId, after: afterId, phase: 'verification-completed', completionStatus, designVerification, codeChanges: 'déclarées par l’agent hôte, non appliquées par le moteur', changes,
+    comparison, unresolvedFindings, toolFailures,
     limitations: ['La liste des fichiers modifiés est déclarative ; elle n’est pas une preuve de causalité ni un diff certifié.', 'Seuls les contrôles comparables peuvent étayer la disparition d’un constat. Les autres cas demandent une vérification manuelle.', 'Une vérification terminée ne signifie pas que tout a été corrigé.']
   };
   await writeFile(join(store.dir(beforeId), 'debugging-result.json'), JSON.stringify(result, null, 2));
   const lines = ['# Débogage — compte rendu avant / après', '', `Audit initial : ${beforeId}. Audit après corrections : ${afterId}.`, '',
-    'Les corrections sont réalisées par l’agent hôte. Ce compte rendu distingue les modifications déclarées et la vérification réelle.', '', '## Fichiers modifiés (déclaration de l’agent)', '', ...changes.map(c => `- ${c.file} : ${c.summary}`), '', '## Vérification', '',
+    'Les corrections sont réalisées par l’agent hôte. Ce compte rendu distingue les modifications déclarées et la vérification réelle.', '', `État des corrections : ${completionStatus}.`, `Cohérence : ${designVerification.status}, ${designVerification.remaining} différence(s) restante(s).`, designVerification.note, '', '## Fichiers modifiés (déclaration de l’agent)', '', ...changes.map(c => `- ${c.file} : ${c.summary}`), '', '## Vérification', '',
     ...comparison.map(c => `- ${c.targetId} / ${c.nodeId} : ${c.comparable ? `${c.resolvedFindings.length} constat(s) disparu(s), ${c.addedFindings.length} nouveau(x)` : c.reason}`), '',
     `Constats encore présents (occurrences, états distincts possibles) : ${result.unresolvedFindings.length}. Contrôles empêchés ou en panne : ${result.toolFailures.length}.`, '', '## Limites', '', ...result.limitations.map(l => `- ${l}`), ''];
   await writeFile(join(store.dir(beforeId), 'debugging-result.md'), lines.join('\n'));

@@ -23,6 +23,7 @@ export function summarize(report: Report) {
       const selected = report.results.filter(r => r.block === block), executed = selected.filter(r => ['completed', 'partial'].includes(r.executionStatus));
       const details: string[] = [];
       for (const r of executed) {
+        if (r.nodeId === 'design.collect-styles') details.push(`${r.findings.length} écart(s) de styles ou d’espacements à examiner ; ${r.measurements.find(m => m.name === 'design.compared-action-groups')?.value ?? 0} groupe(s) d’actions et ${r.measurements.find(m => m.name === 'design.compared-spacing-groups')?.value ?? 0} famille(s) d’espacements comparés. Vérifier l’intention et la couverture, même sans écart.`);
         if (r.nodeId === 'a11y.scan-screen') details.push(`${r.targetId} : ${r.findings.length} règle(s) axe en violation sur l’entrée.`);
         if (r.nodeId === 'a11y.scan-journey-states') details.push(`${r.evidence.filter(e => e.artifact?.endsWith('.axe.json')).length} état(s) de parcours analysé(s) en complément.`);
         if (r.nodeId === 'friction.run-journey') details.push(`${r.findings.length} interruption(s) de parcours déclarés ; cause à confirmer avec les captures et traces.`);

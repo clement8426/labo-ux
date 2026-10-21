@@ -119,7 +119,7 @@ ne le corrige pas et ne crée pas de version réparée.**
 
 Les PNG volumineux, délais et erreurs HTTP de son faux service sont intentionnels.
 Les événements fournis sont synthétiques : aucun résultat ne décrit des utilisateurs
-réels. L’inventaire formateur décrit 31 points pédagogiques ; le plugin ne les
+réels. L’inventaire formateur décrit les défauts pédagogiques de la version de l’exercice ; le plugin ne les
 détecte pas tous automatiquement. Sépare les observations complémentaires de
 l’agent des résultats des contrôles génériques.
 
@@ -157,7 +157,7 @@ constat ne prouve pas que le produit est correct.
 En mode Débogage autorisé sur mon propre projet, appelle `get_debugging_plan` ou
 `debug-plan` après l’audit initial, corrige dans le périmètre convenu, puis refais
 les tests et l’audit sans changer leurs assertions pour les faire passer. Termine
-avec `finish_debugging` ou `debug-finish`. Liste les fichiers modifiés, les problèmes
+avec `finish_debugging` ou `debug-finish`. Pour la cohérence, lis les écarts de styles et d’espacements, confirme les actions de même fonction et traite aussi les liens d’action. Vérifie les captures aux mêmes largeurs après correction. Lis completionStatus et designVerification : une vérification terminée ne signifie pas que tout est corrigé. Liste les fichiers modifiés, les problèmes
 encore présents et les vérifications impossibles. Ne promets pas de tout corriger.
 
 Je veux une explication simple de ce qui fonctionne et du prochain choix à faire,

@@ -1,6 +1,6 @@
 {
   "name": "labo-ux",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Kit modulaire d’audit UX : moteur, CLI et MCP local",
   "type": "module",
   "license": "UNLICENSED",

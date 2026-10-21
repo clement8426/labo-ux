@@ -18,8 +18,8 @@ export const checks = [
     supportedTargets: ['web', 'webview'], requiredCapabilities: [...required],
     resourceRequirements: task === 'lighthouse' ? ['exclusive'] : ['browser'],
     retryPolicy: { maxAttempts: task === 'lighthouse' ? 2 : 1, transientErrors: task === 'lighthouse' ? ['fetch browser webSocket URL', 'ECONNREFUSED'] : [], idempotent: !['journeys', 'axe-states'].includes(task) },
-    timeoutMs: task === 'axe-states' ? 180000 : task === 'lighthouse' ? 120000 : 60000,
-    version: task === 'lighthouse' ? '1.2.0' : '1.0.0'
+    timeoutMs: task === 'axe-states' || task === 'styles' ? 180000 : task === 'lighthouse' ? 120000 : 60000,
+    version: task === 'lighthouse' ? '1.2.0' : task === 'styles' ? '2.0.0' : '1.0.0'
   })),
   define('a11y.native-audit', 'accessibility', async () => { throw new Error('Audit natif non livré ; aucune mesure produite'); }, { supportedTargets: ['android', 'ios'], requiredCapabilities: ['audit.native-accessibility'], resourceRequirements: ['device'] }),
   define('performance.measure-startup', 'performance', async () => { throw new Error('Mesure native non livrée ; aucune mesure produite'); }, { supportedTargets: ['android', 'ios'], requiredCapabilities: ['performance.native'], resourceRequirements: ['device', 'exclusive'] })

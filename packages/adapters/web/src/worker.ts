@@ -5,6 +5,7 @@ import type { Browser, Page, Locator } from 'playwright-core';
 import { OutputSchema, type Plan, type Target, type Action, type Output, type Evidence, type Finding } from '../../../contracts/src/index.js';
 import { resourceDiagnostics, lighthouseDiagnostics, type ResourceObservation } from './diagnostics.js';
 import { browserDiagnostics } from './browser-diagnostics.js';
+import { inspectDesign } from './design.js';
 
 let browser: Browser | undefined, cancelled = false;
 let chromeProcess: { kill: () => void | Promise<unknown> } | undefined;
@@ -152,10 +153,8 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
     for (const v of result.violations) findings.push({ id: v.id, title: v.help, description: `${v.description} (${v.nodes.length} élément(s))`, recommendation: `Consulter ${v.helpUrl} et les sélecteurs dans la preuve.`, severity: v.impact === 'critical' ? 'critical' : v.impact === 'serious' ? 'major' : 'minor', evidenceIds: ['axe'], confidence: 'confirmed' });
     limitations.push('Page d’entrée uniquement, état courant. Clavier, technologies d’assistance, états protégés et autres écrans restent à vérifier.');
   } else if (task === 'styles') {
-    const styles = await page.locator('button, h1, h2, input, [role="button"]').evaluateAll(elements => elements.slice(0, 300).map(el => { const s = getComputedStyle(el); return { tag: el.tagName, text: el.textContent?.trim().slice(0, 120), font: s.font, color: s.color, background: s.backgroundColor, padding: s.padding, borderRadius: s.borderRadius, unit: 'CSS px' }; }));
-    await writeFile(join(artifactDir, 'styles.json'), JSON.stringify(styles, null, 2));
-    evidence.push({ id: 'styles', kind: 'runtime-observation', summary: `${styles.length} composants observés, viewport 1280 × 900 CSS px`, artifact: 'styles.json' });
-    limitations.push('Inventaire du rendu de la page d’entrée, sans comparaison automatique des rôles ou des états entre pages.');
+    const result = await inspectDesign(page, url, artifactDir, plan.design);
+    return OutputSchema.parse({ ...result, toolVersions: { ...tools, ...result.toolVersions } });
   } else if (task === 'copy') {
     const controls = await page.locator('button, label, input, [role="alert"], [role="status"], [aria-label]').evaluateAll(elements => elements.slice(0, 500).map(el => ({ tag: el.tagName, text: el.textContent?.trim(), label: el.getAttribute('aria-label'), placeholder: el.getAttribute('placeholder') })));
     await writeFile(join(artifactDir, 'copy.json'), JSON.stringify(controls, null, 2));

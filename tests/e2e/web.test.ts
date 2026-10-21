@@ -21,7 +21,11 @@ it.skipIf(!available)('audite une fixture réelle avec axe, collecte des preuves
         steps: [{ action: 'enter-text', locator: { testId: 'email' }, value: 'test@example.test' }, { action: 'activate', locator: { role: 'button', name: 'Cliquez ici' } }, { action: 'expect-text', locator: { testId: 'confirmation' }, expected: 'demande fictive' }, { action: 'checkpoint' }] }] }));
     const { stdout } = await exec(process.execPath, [resolve('dist/packages/cli/src/index.js'), 'run', '--config', config], { timeout: 65000, maxBuffer: 1000000 });
     const result = JSON.parse(stdout), report = JSON.parse(await readFile(join(outputDir, result.state.id, 'report.json'), 'utf8'));
-    expect(report.results).toHaveLength(4); expect(report.results.every((r: any) => r.executionStatus === 'completed')).toBe(true);
+    expect(report.results).toHaveLength(4);
+    expect(report.results.filter((r: any) => r.nodeId !== 'design.collect-styles').every((r: any) => r.executionStatus === 'completed')).toBe(true);
+    const design = report.results.find((r: any) => r.nodeId === 'design.collect-styles');
+    expect(design.executionStatus).toBe('partial'); // Aucun composant répété dans cette fixture de formulaire.
+    expect(design.measurements.find((m: any) => m.name === 'design.compared-action-groups').value).toBe(0);
     const axe = report.results.find((r: any) => r.nodeId === 'a11y.scan-screen'); expect(axe.findings.some((f: any) => f.id === 'image-alt')).toBe(true);
     const journey = report.results.find((r: any) => r.nodeId === 'friction.run-journey'); expect(journey.findings).toHaveLength(0);
     await access(join(outputDir, result.state.id, 'evidence', journey.evidence.find((e: any) => e.artifact?.endsWith('.zip')).artifact));

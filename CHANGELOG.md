@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1 — 2026-10-21
+
+- Comparaison réelle des styles et espacements des composants répétés, boutons et liens inclus, à 1280 et 375 px.
+- Pages et groupes homologues configurables, preuves CSS et captures, variantes intentionnelles à confirmer.
+- Écarts intégrés au plan de correction ; bilan distinguant corrections incomplètes et couverture insuffisante.
+- Tests unitaires et navigateur sur une fixture indépendante : détection, fausse correction, harmonisation et variantes légitimes.
+
 ## 0.3.0 — 2026-10-21
 
 - Export PDF client autonome, version HTML imprimable, bouton dans le rapport,

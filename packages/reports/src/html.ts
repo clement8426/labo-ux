@@ -25,7 +25,7 @@ const paths: Record<string,string> = {
 const icon=(name:string,cls='')=>`<svg class="${cls}" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]??paths.file}</svg>`;
 const blockIcons: Record<string,string> = {'design-system':'layers',friction:'route',accessibility:'accessibility',behavior:'chart',microcopy:'text',performance:'speed'};
 const checkNames: Record<string,string> = {
-  'design.collect-tokens':'Couleurs et variables dans le code','design.collect-styles':'Styles des composants affichés',
+  'design.collect-tokens':'Couleurs et variables dans le code','design.collect-styles':'Cohérence des actions et espacements',
   'friction.validate-journey':'Préparation des parcours','friction.run-journey':'Exécution des parcours',
   'a11y.check-labels':'Alternatives d’images dans le code','a11y.scan-screen':'Page d’entrée · axe','a11y.scan-journey-states':'États des parcours · axe','a11y.native-audit':'Accessibilité native',
   'copy.review-context':'Textes à examiner dans le code','copy.collect-controls':'Textes des commandes affichées',

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const schemaVersion = '1' as const;
-export const kitVersion = '0.3.0' as const;
+export const kitVersion = '0.3.1' as const;
 export const blocks = ['design-system', 'friction', 'accessibility', 'behavior', 'microcopy', 'performance'] as const;
 // Les diagnostics techniques complètent les six blocs UX sans en devenir un septième.
 export const reportSections = [...blocks, 'technical'] as const;
@@ -39,6 +39,11 @@ export const PlanSchema = z.object({
   objective: z.string().default('Identifier les obstacles UX'), confirmed: z.boolean().default(false),
   targets: z.array(TargetSchema).min(1), blocks: z.array(z.enum(reportSections)).default([...reportSections]),
   checks: z.array(z.string()).optional(), journeys: z.array(JourneySchema).default([]),
+  design: z.object({
+    pages: z.array(z.string().max(2000)).max(8).default([]),
+    viewports: z.array(z.object({ width: z.number().int().min(320).max(2560), height: z.number().int().min(400).max(1600) })).min(1).max(3).default([{ width: 1280, height: 900 }, { width: 375, height: 812 }]),
+    groups: z.array(z.object({ id: z.string().regex(/^[\w.-]+$/), selector: z.string().min(1).max(1000) })).max(20).default([])
+  }).optional(),
   behavior: z.object({ file: z.string(), steps: z.array(z.string().min(1)).min(2).max(100), windowMs: z.number().positive().default(1800000) }).optional(),
   permissions: z.object({ runtime: z.boolean().default(false), dataMutation: z.boolean().default(false), codeModification: z.boolean().default(false) }).default({ runtime: false, dataMutation: false, codeModification: false }),
   concurrency: z.number().int().min(1).max(16).default(3), timeoutMs: z.number().int().min(10).max(600000).default(60000),
