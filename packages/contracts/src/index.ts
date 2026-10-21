@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const schemaVersion = '1' as const;
+export const kitVersion = '0.2.0' as const;
 export const blocks = ['design-system', 'friction', 'accessibility', 'behavior', 'microcopy', 'performance'] as const;
 export const targetKinds = ['web', 'android', 'ios', 'webview'] as const;
 export const executionStatuses = ['completed', 'partial', 'error', 'timed-out', 'skipped', 'not-applicable', 'cancelled'] as const;
@@ -31,16 +32,19 @@ export const TargetSchema = z.object({
 });
 export const PlanSchema = z.object({
   schemaVersion: z.literal(schemaVersion).default(schemaVersion), projectRoot: z.string(),
+  mode: z.enum(['audit', 'debug']).default('audit'),
   usage: z.enum(['showcase', 'content', 'ecommerce', 'saas', 'business-app', 'custom']).default('custom'),
   objective: z.string().default('Identifier les obstacles UX'), confirmed: z.boolean().default(false),
   targets: z.array(TargetSchema).min(1), blocks: z.array(z.enum(blocks)).default([...blocks]),
   checks: z.array(z.string()).optional(), journeys: z.array(JourneySchema).default([]),
   behavior: z.object({ file: z.string(), steps: z.array(z.string().min(1)).min(2).max(100), windowMs: z.number().positive().default(1800000) }).optional(),
-  permissions: z.object({ runtime: z.boolean().default(false), dataMutation: z.boolean().default(false) }).default({ runtime: false, dataMutation: false }),
+  permissions: z.object({ runtime: z.boolean().default(false), dataMutation: z.boolean().default(false), codeModification: z.boolean().default(false) }).default({ runtime: false, dataMutation: false, codeModification: false }),
   concurrency: z.number().int().min(1).max(16).default(3), timeoutMs: z.number().int().min(10).max(600000).default(60000),
   outputDir: z.string().default('.labo-ux'),
   source: z.discriminatedUnion('mode', [z.object({ mode: z.literal('local') }), z.object({ mode: z.literal('ssh'), host: z.string().regex(/^[a-zA-Z0-9_.@-]+$/).refine(v => !v.startsWith('-')), remoteRoot: z.string().min(1), port: z.number().int().min(1).max(65535).default(22) })]).default({ mode: 'local' })
 }).superRefine((v, ctx) => {
+  if (v.mode === 'audit' && v.permissions.codeModification) ctx.addIssue({ code: 'custom', message: 'Le mode audit interdit la modification du code ; utiliser le mode debug pour autoriser les corrections.' });
+  if (v.mode === 'debug' && !v.permissions.codeModification) ctx.addIssue({ code: 'custom', message: 'Le mode debug exige l’autorisation explicite permissions.codeModification: true.' });
   if (new Set(v.targets.map(t => t.id)).size !== v.targets.length) ctx.addIssue({ code: 'custom', message: 'Identifiants de cibles dupliqués' });
   if (new Set(v.journeys.map(j => j.id)).size !== v.journeys.length) ctx.addIssue({ code: 'custom', message: 'Identifiants de parcours dupliqués' });
   for (const j of v.journeys) if (!v.targets.some(t => t.id === j.targetId)) ctx.addIssue({ code: 'custom', message: `Cible du parcours inconnue : ${j.targetId}` });

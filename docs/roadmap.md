@@ -10,7 +10,9 @@ l’ensemble des sept lots.
    rapports partiels. Restent les migrations et la qualification de tous les
    adaptateurs externes selon une suite commune complète.
 2. **Web : première tranche vérifiée.** Fixture vitrine, Playwright, axe, Lighthouse,
-   parcours et premières vérifications des six blocs. Démo React/Vite facultative
+   parcours, axe aux checkpoints et observation des ressources/cache des images.
+   Exercice Next.js Traverse uniquement cassé, avec qualification CLI/MCP et
+   preuves des 31 points pédagogiques. Démo React/Vite facultative
    avec 24 défauts communs documentés, modes cassé/corrigé et auto-test de référence.
    À compléter : fixtures
    e-commerce/SaaS, comparaisons design, états UX, clavier et performance perçue.
@@ -24,7 +26,9 @@ l’ensemble des sept lots.
 6. **SSH et multi-hôtes : amorce.** Collecte de sources en lecture seule et plans
    multicibles ; aucun test SSH réel ni worker distribué/tunnel livré.
 7. **Distribution : première tranche vérifiée.** CLI, MCP, skill commun, générateur
-   de distributions locales, rapports, comparaison et workflow CI. Restent la
+   de distributions locales, rapports visuels, modes Audit/Débogage et workflow CI.
+   Un PROMPT.md et le script setup préparent le moteur et lancent un audit réel de
+   vérification sans commandes à taper par l’apprenant. Restent la
    qualification d’installation des hôtes, archives autonomes, publication,
    mises à jour et procédure de retour arrière d’une version publiée.
 

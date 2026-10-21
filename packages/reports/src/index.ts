@@ -2,8 +2,41 @@ import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { blocks, type Result, type RunState } from '../../contracts/src/index.js';
 import { Store } from '../../core/src/store.js';
+import { renderHtml } from './html.js';
 export type Report = { schemaVersion: '1'; state: RunState; results: Result[]; limitations: string[] };
-const escape = (s: unknown) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+export const blockNames = { 'design-system': 'Cohérence des composants', friction: 'Frictions et parcours', accessibility: 'Accessibilité', behavior: 'Données comportementales', microcopy: 'Microcopie', performance: 'Performances' };
+const findingNames: Record<string, string> = { 'button-name': 'Bouton sans nom accessible', 'image-alt': 'Images sans alternative textuelle', 'html-has-lang': 'Langue du document absente', 'color-contrast': 'Contrastes insuffisants', 'landmark-one-main': 'Repère principal absent', region: 'Contenu en dehors des repères' };
+const modeText = (report: Report) => report.state.plan.mode === 'debug' ? 'Débogage — audit initial avant corrections. L’agent hôte doit lire les preuves, corriger puis lancer un nouvel audit.' : 'Audit — lecture et tests autorisés, sans réécriture du code. Le moteur écrit uniquement ses résultats et preuves.';
+export function summarize(report: Report) {
+  const priorities = new Map<string, { title: string; targetId: string; nodeId: string; severity: string; confidence: string; recommendation: string }>();
+  for (const r of report.results) for (const f of r.findings) {
+    const title = findingNames[f.id.split('.').at(-1)!] ?? (r.nodeId === 'friction.run-journey' ? `Parcours interrompu : ${f.id.replace(/-failure$/, '')}` : f.title);
+    const key = `${r.targetId}:${title}`;
+    if (!priorities.has(key)) priorities.set(key, { title, targetId: r.targetId, nodeId: r.nodeId, severity: f.severity, confidence: f.confidence, recommendation: f.recommendation });
+  }
+  const severity: Record<string, number> = { critical: 0, major: 1, minor: 2, info: 3 };
+  return {
+    mode: report.state.plan.mode ?? 'audit', modeText: modeText(report),
+    failures: report.results.filter(r => ['error', 'timed-out', 'cancelled'].includes(r.executionStatus)).length,
+    priorities: [...priorities.values()].sort((a, b) => (severity[a.severity]! - severity[b.severity]!) || Number(b.confidence === 'confirmed') - Number(a.confidence === 'confirmed')).slice(0, 6),
+    blocks: blocks.map(block => {
+      const selected = report.results.filter(r => r.block === block), executed = selected.filter(r => ['completed', 'partial'].includes(r.executionStatus));
+      const details: string[] = [];
+      for (const r of executed) {
+        if (r.nodeId === 'a11y.scan-screen') details.push(`${r.targetId} : ${r.findings.length} règle(s) axe en violation sur l’entrée.`);
+        if (r.nodeId === 'a11y.scan-journey-states') details.push(`${r.evidence.filter(e => e.artifact?.endsWith('.axe.json')).length} état(s) de parcours analysé(s) en complément.`);
+        if (r.nodeId === 'friction.run-journey') details.push(`${r.findings.length} interruption(s) de parcours déclarés ; cause à confirmer avec les captures et traces.`);
+        if (r.nodeId === 'design.collect-tokens') { const m=r.measurements.find(m=>m.name==='source.distinct-color-literals');if(m)details.push(`${m.value} couleur(s) littérale(s) inventoriée(s). Leur nombre ne prouve pas une incohérence.`); }
+        if (r.nodeId === 'copy.review-context') details.push(`${r.findings.length} signal(aux) de texte ambigu dans le code, à examiner dans leur contexte.`);
+        if (r.nodeId === 'behavior.compute-funnel') { const steps=r.measurements.filter(m=>/^funnel\.\d+\./.test(m.name));const duplicates=r.measurements.find(m=>m.name==='data.duplicates');if(steps.length)details.push(`${r.targetId} : ${steps.map(m=>m.value).join(' → ')} sessions dans le tunnel importé ; ${duplicates?.value ?? 'nombre inconnu de'} doublon(s). Ces données ne prouvent pas les causes d’abandon.`); }
+        if (r.nodeId === 'performance.inspect-resources') { const m=r.measurements.find(m=>m.name==='resources.observed-image-bytes');if(m)details.push(`${r.targetId} : ${(m.value/1_000_000).toLocaleString('fr-FR',{maximumFractionDigits:2})} Mo d’images observées ; ${r.findings.filter(f=>f.id.startsWith('uncached-image-')).length} image(s) avec no-store.`); }
+        if (r.nodeId === 'performance.measure-web-load') { const m=r.measurements.find(m=>m.name==='largest-contentful-paint');if(m)details.push(`LCP Lighthouse ${m.context.formFactor ?? ''} : ${(m.value/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})} s, mesure de laboratoire simulée ; ce n’est pas une mesure terrain.`); }
+      }
+      return { block, label: blockNames[block], checks: selected.length, executed: executed.length, findings: selected.reduce((n, r) => n + r.findings.length, 0), evidence: selected.reduce((n, r) => n + r.evidence.length, 0),
+        message: !selected.length ? 'Non sélectionné.' : !executed.length ? 'Aucun contrôle exécuté ; consulter les prérequis.' : details.length ? details.join(' ') : `${executed.length} contrôle(s) exécuté(s), ${selected.reduce((n, r) => n + r.evidence.length, 0)} preuve(s). Les inventaires et hypothèses restent à interpréter.` };
+    })
+  };
+}
 export async function readReport(store: Store, id: string): Promise<Report> {
   const state = await store.state(id), { results, limitations } = await store.results(id);
   return { schemaVersion: '1', state, results, limitations: [...state.limitations, ...limitations] };
@@ -12,7 +45,10 @@ export function markdown(report: Report): string {
   const { state, results } = report;
   const lines = [`# Audit UX — ${state.id}`, '', `État : ${state.status}. Objectif : ${state.plan.objective}`, '',
     `Sources : ${state.fingerprint}. Début : ${state.startedAt}.`, '',
-    'La couverture correspond aux contrôles enregistrés dans cette version du kit. Un contrôle terminé ne constitue pas une validation de tout le bloc.', '', '## Couverture', ''];
+    modeText(report), '', 'Le moteur ne corrige pas le projet. Les corrections éventuelles relèvent de l’agent hôte en mode débogage autorisé.', '',
+    'La couverture correspond aux contrôles enregistrés dans cette version du kit. Un contrôle terminé ne constitue pas une validation de tout le bloc.', '', '## Synthèse', ''];
+  const summary = summarize(report);
+  lines.push(`Erreurs d’outils : ${summary.failures}. Les défauts du produit sont distincts des pannes des outils.`, '', ...summary.blocks.map(b => `- ${b.label} : ${b.message}`), '', '### Points à examiner en priorité', '', ...summary.priorities.map(p => `- ${p.title} (${p.confidence === 'confirmed' ? 'constat étayé par un outil' : 'cause à confirmer'}) — ${p.targetId} / ${p.nodeId}.`), '', 'Ces priorités regroupent certains constats répétés entre états ; elles ne constituent pas un inventaire exhaustif de défauts distincts.', '', '## Couverture', '');
   for (const status of ['completed', 'partial', 'error', 'timed-out', 'skipped', 'not-applicable', 'cancelled']) lines.push(`- ${status} : ${results.filter(r => r.executionStatus === status).length}`);
   for (const t of state.plan.targets) {
     lines.push('', `## Cible ${t.id} (${t.kind})`, '');
@@ -36,21 +72,7 @@ export function markdown(report: Report): string {
   return lines.join('\n');
 }
 export function html(report: Report): string {
-  const { state, results } = report;
-  const statusCounts = Object.fromEntries(['completed', 'partial', 'skipped', 'not-applicable', 'error', 'timed-out', 'cancelled'].map(s => [s, results.filter(r => r.executionStatus === s).length]));
-  return `<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'"><title>Audit UX ${escape(state.id)}</title>
-<style>:root{font:16px/1.6 system-ui;color:#172b36;background:#f3f6f5}body{max-width:1120px;margin:auto;padding:36px 24px}h1{font-size:2.6rem;line-height:1.1}h2{margin-top:2rem}a{color:#005b70}header{border-bottom:3px solid #007e80;padding-bottom:24px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card,article{background:white;border:1px solid #cedcda;border-radius:12px;padding:18px;margin:12px 0}.card strong{display:block;font-size:2rem}.tag{border:1px solid #cedcda;border-radius:4px;padding:2px 8px}summary{cursor:pointer;font-weight:600}.error{color:#8b2424}pre{white-space:pre-wrap;overflow-wrap:anywhere}li{margin:8px 0}.muted{color:#4e626b}article{border-left:4px solid #007e80}nav{display:flex;gap:16px;flex-wrap:wrap}img{max-width:100%}</style>
-<header><p>LABO UX · RAPPORT LOCAL · v0.1</p><h1>Ce qui a été vérifié.<br>Ce qui reste à explorer.</h1><p>${escape(state.plan.objective)}</p><p><span class="tag">${escape(state.status)}</span> · ${escape(state.startedAt)} · ${state.plan.targets.length} cible(s)</p></header>
-<p class="muted">Chaque contrôle a son périmètre. Les blocs ne sont pas résumés par un score universel. Les constats du produit, les erreurs d’outils et les limites sont séparés.</p>
-<div class="cards">${Object.entries(statusCounts).map(([s, n]) => `<div class="card"><strong>${n}</strong>${s}</div>`).join('')}</div>
-<nav aria-label="Cibles">${state.plan.targets.map(t => `<a href="#${escape(t.id)}">${escape(t.id)} · ${t.kind}</a>`).join('')}</nav>
-${state.plan.targets.map(t => `<section id="${escape(t.id)}"><h2>${escape(t.id)} · ${t.kind}</h2>${blocks.map(b => `<h3>${b}</h3>${results.filter(r => r.targetId === t.id && r.block === b).map(r => `<article><h4>${escape(r.nodeId)} <span class="tag">${r.executionStatus}</span></h4><p class="muted">${Math.round(r.durationMs)} ms · règle ${escape(r.nodeVersion)} · ${r.attempts.length} tentative(s)${r.unstable ? ' · instable' : ''}</p>
-${r.findings.length ? `<h5>Constats sur le produit</h5><ul>${r.findings.map(f => `<li><strong>${escape(f.title)}</strong> [${f.severity} ; ${f.confidence}]<p>${escape(f.description)}</p><p>${escape(f.recommendation)}</p><small>Preuves : ${escape(f.evidenceIds.join(', '))}</small></li>`).join('')}</ul>` : ''}
-${r.error ? `<p class="error"><strong>Erreur d’outil :</strong> ${escape(r.error)}</p>` : ''}
-${r.measurements.length ? `<h5>Mesures</h5><ul>${r.measurements.map(m => `<li>${escape(m.name)} : <strong>${m.value} ${escape(m.unit)}</strong><small> · ${escape(JSON.stringify(m.context))}</small></li>`).join('')}</ul>` : ''}
-<details><summary>Preuves (${r.evidence.length})</summary><ul>${r.evidence.map(e => `<li><span class="tag">${e.kind}</span> ${escape(e.id)} : ${escape(e.summary)}${e.file ? `<p>${escape(e.file)}:${e.line ?? ''}</p>` : ''}${e.artifact ? `<p><a href="evidence/${escape(e.artifact.split('/').map(encodeURIComponent).join('/'))}">Ouvrir la preuve</a></p>` : ''}</li>`).join('')}</ul></details>
-${r.limitations.length ? `<h5>Limites et contrôles restants</h5><ul>${r.limitations.map(l => `<li>${escape(l)}</li>`).join('')}</ul>` : ''}</article>`).join('') || '<p>Aucun résultat dans cette sélection.</p>'}`).join('')}</section>`).join('')}
-<h2>Limites de l’exécution</h2><ul>${report.limitations.map(l => `<li>${escape(l)}</li>`).join('')}</ul><details><summary>Environnement et version du code</summary><pre>${escape(JSON.stringify({ fingerprint: state.fingerprint, versions: state.versions, capabilities: state.capabilities }, null, 2))}</pre></details></html>`;
+  return renderHtml(report, summarize(report));
 }
 export async function writeReports(store: Store, id: string): Promise<{ files: string[]; errors: string[] }> {
   const report = await readReport(store, id), files: string[] = [], errors: string[] = [];

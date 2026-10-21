@@ -1,10 +1,11 @@
-# Compatibilité de la version 0.1
+# Compatibilité de la version 0.2
 
 ## Web
 
 HTML : collecte du code, Chromium, parcours déclaratifs, captures/traces,
 inventaire des styles calculés, inventaire des textes/contrôles, axe sur l’état
-d’entrée et mesures Lighthouse facultatives. Fixture vitrine exécutée sous Windows.
+d’entrée et les checkpoints, ressources/cache et mesures Lighthouse facultatives.
+Fixture vitrine et exercice Next.js exécutés sous Windows.
 Une CI Windows/Linux/macOS est fournie ; ces deux dernières plateformes ne sont pas
 présentées comme vérifiées sur cette machine.
 
@@ -12,7 +13,10 @@ React, Next, Vue, Nuxt, Angular, Svelte et Astro : détection de manifestes et a
 statique générique. Une démo React/Vite exécutable est fournie dans
 [labo-ux-demos/web](https://github.com/clement8426/labo-ux-demos/tree/main/web),
 avec modes cassé/corrigé et cas de référence. Les autres frameworks
-ne disposent pas encore de fixture propre ; leur instance démarrée peut être
+ne disposent pas tous de fixture propre. Next.js dispose maintenant de l’exercice
+local `labo-ux-demos/exercices/traverse`, uniquement défectueux ; qualification
+en production locale sous Windows, sans promesse de prise en charge intégrale.
+Une instance démarrée peut être
 visée par le pilote web, sans promesse de prise en charge intégrale. Même limite
 pour les CMS et interfaces générées côté serveur.
 
@@ -22,13 +26,23 @@ sont pas livrés.
 
 ## Six blocs : couverture effective
 
+Les modes Audit et Débogage partagent les mêmes contrôles. Le mode Audit ne
+réécrit pas le code ; le mode Débogage fournit un audit initial, un plan de relais
+à l’agent hôte et une vérification avant/après. Il n’ajoute pas un moteur d’édition
+autonome : les corrections dépendent des outils, permissions et capacités de
+l’agent hôte. Les permissions ne constituent pas un verrou système sur cet hôte.
+
 - Design system : inventaire des couleurs littérales et styles de la page d’entrée.
   Comparaison des composants, états, adaptation, texte agrandi et thèmes à réaliser.
 - Friction : validation du schéma et exécution des actions web déclarées, traces,
   assertions et captures. Préconditions métier, réinitialisation et détection
   automatique des effets de bord à réaliser.
 - Accessibilité : signalement heuristique d’images sans alternative et axe sur la
-  page d’entrée. Navigation clavier, focus, dialogues et lecture d’écran à réaliser.
+  page d’entrée. Le contrôle distinct `a11y.scan-journey-states` rejoue les parcours
+  jusqu’au dernier `checkpoint` et lance axe sur chaque checkpoint atteint.
+  Il respecte les permissions de mutation, n’exécute pas les actions natives et
+  signale les checkpoints non atteints. Navigation clavier, focus, qualité des
+  dialogues et lecture d’écran restent à vérifier manuellement.
 - Comportement : import JSON/CSV validé, déduplication par id, segmentation par
   plateforme et tunnel ordonné par utilisateur/session dans une fenêtre. Aucun taux
   sans dénominateur, aucune cause UX déduite automatiquement.
@@ -36,7 +50,13 @@ sont pas livrés.
   dans le DOM. Analyse des états, terminologie et appréciation éditoriale à réaliser
   avec le skill et le propriétaire.
 - Performance : contexte déclaré et mesures Lighthouse individuelles, isolées des
-  autres tâches de l’audit. Simulation lente, loader bloqué, double soumission,
+  autres tâches de l’audit. Les diagnostics en échec de la catégorie performance
+  sont restitués avec le JSON brut ; les économies sont des estimations.
+  `performance.inspect-resources` observe séparément les réponses, les tailles
+  connues, les headers et les dimensions naturelles/affichées des images.
+  Les images de plus de 1 Mo et celles du même domaine avec `no-store` sont
+  signalées comme observations à contextualiser. Aucun verdict cache sur une
+  réponse API ou sur le cache serveur. Simulation lente, loader bloqué, double soumission,
   User Flows et feedback d’interaction à réaliser.
 
 ## Mobile

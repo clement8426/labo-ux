@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import os from 'node:os';
-import { OutputSchema, schemaVersion, type Check, type Context, type Plan, type Result, type RunState, type Snapshot, type Capability } from '../../contracts/src/index.js';
+import { OutputSchema, schemaVersion, kitVersion, type Check, type Context, type Plan, type Result, type RunState, type Snapshot, type Capability } from '../../contracts/src/index.js';
 import { capabilitiesFor, snapshotForPlan } from '../../project-discovery/src/index.js';
 import { targetSnapshot } from '../../adapters/source/src/index.js';
 import { Store } from './store.js';
@@ -48,7 +48,7 @@ export class AuditEngine {
     if (!plan.confirmed) throw new Error('Le plan doit être confirmé avant exécution (confirmed: true)');
     const { snapshot, checks, capabilities } = await prepare(plan, this.registry);
     const state: RunState = { schemaVersion, id: randomUUID(), status: 'running', plan, fingerprint: snapshot.fingerprint, startedAt: new Date().toISOString(), capabilities,
-      versions: { node: process.version, os: `${os.platform()} ${os.release()}`, kit: '0.1.0' }, limitations: snapshot.limitations,
+      versions: { node: process.version, os: `${os.platform()} ${os.release()}`, kit: kitVersion }, limitations: snapshot.limitations,
       checkVersions: Object.fromEntries(checks.map(c => [c.id, c.version])) };
     await this.store.initialize(state); return state;
   }

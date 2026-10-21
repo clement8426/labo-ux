@@ -1,8 +1,8 @@
 # Labo UX
 
 Kit d’audit UX modulaire en TypeScript, avec CLI, serveur MCP local et skill commun
-aux distributions locales Codex et Claude. Version **0.1.0** : socle résilient et
-premières intégrations web réellement exécutables. Le plan complet n’est pas encore
+aux distributions locales Codex et Claude. Version **0.2.0** : modes audit/débogage,
+rapport visuel autonome et installation guidée par l’agent. Le plan complet n’est pas encore
 livré ; voir [l’état des lots](docs/roadmap.md) et [la compatibilité](docs/compatibility.md).
 
 Le moteur travaille sans modèle IA. Une vérification en panne ou indisponible
@@ -12,15 +12,33 @@ Markdown et HTML restent consultables pour les audits partiels.
 
 Les applications pédagogiques sont dans le dépôt séparé
 [labo-ux-demos](https://github.com/clement8426/labo-ux-demos). Il propose
-deux univers distincts : **Les mains libres**, réservation d’ateliers, et **PULSE**,
+les démos **Les mains libres**, réservation d’ateliers, et **PULSE**,
 coaching sportif avec personnalisation et abonnement fictif. Elles ont une
 interface soignée, 24 familles de défauts documentées, un mode corrigé et un
 auto-test de référence (`npm run verify` depuis ce dépôt de démos). Cloner et
 installer ce plugin ne récupère ni les apps ni leurs dépendances React/Expo.
+L’exercice court **Traverse**, en Next.js, est disponible dans `exercices/traverse` :
+31 points pédagogiques connus et une seule version volontairement cassée.
 Les démos servent aussi aux cours ; une qualification
 réussie retrouve les défauts attendus et conserve les limites manuelles/natives.
 
 ## Installation
+
+### Pour les apprenants : donner le travail à l’agent
+
+Télécharger ou ouvrir [PROMPT.md](PROMPT.md), puis le joindre à son agent local avec
+la phrase : **« Suis ce fichier, installe Labo UX et montre-moi un premier audit. »**
+L’agent fait les commandes et les vérifications. L’apprenant n’a pas à utiliser
+un terminal. L’agent doit avoir les droits nécessaires sur les fichiers, le terminal,
+le navigateur et le dépôt GitHub. Un chat sans outils locaux ne suffit pas.
+Un dépôt privé demande un accès GitHub accordé par le formateur.
+
+Le script `node scripts/setup.mjs`, exécuté par l’agent, prépare le moteur et
+Chromium puis réalise un audit de contrôle avec axe, Lighthouse et un parcours
+fictif. Son résultat se trouve dans `.labo-ux/setup.json`, avec le lien du rapport.
+Le CLI peut être utilisé immédiatement, sans configurer de MCP ni redémarrer l’hôte.
+
+### Installation manuelle pour le formateur
 
 Node.js 22 ou supérieur ; tester de préférence avec Node 24.
 
@@ -118,6 +136,46 @@ Ne pas utiliser le code de sortie seul comme seuil de qualité produit.
 
 ## MCP et agents
 
+### Deux modes : audit ou débogage
+
+- **Audit** (par défaut) : lecture du projet, tests autorisés et rapports ; aucune
+  réécriture du code. Les données fictives de test restent soumises à `dataMutation`.
+- **Débogage** : audit initial obligatoire, corrections par l’agent hôte, tests,
+  nouvel audit du même protocole et compte rendu avant/après. Le moteur n’édite pas
+  lui-même les sources et ne promet pas de tout corriger.
+
+Dans le plan : `mode: "audit"` avec `permissions.codeModification: false`, ou
+`mode: "debug"` avec `permissions.codeModification: true`. Les combinaisons
+contradictoires sont refusées. Ces permissions sont le contrat de l’agent hôte ;
+le plugin ne peut pas verrouiller les outils d’édition indépendants de cet agent.
+
+```sh
+# Audit seul, sans réécriture
+node dist/packages/cli/src/index.js run --config audit.json --mode audit
+
+# Audit initial d’un débogage autorisé, puis préparation du travail de l’agent
+node dist/packages/cli/src/index.js run --config audit.json --mode debug --allow-code-changes
+node dist/packages/cli/src/index.js debug-plan <avant> --output .labo-ux
+
+# Après les corrections réalisées par l’agent et le nouvel audit :
+node dist/packages/cli/src/index.js debug-finish <avant> <apres> --changes fichiers.json --output .labo-ux
+
+# Ouvrir un rapport existant sans relancer les tests
+node dist/packages/cli/src/index.js serve-report <runId> --output .labo-ux --port 4193
+```
+
+`fichiers.json` contient les chemins relatifs et explications, par exemple
+`[{"file":"app/page.tsx","summary":"Libellé du bouton précisé"}]`. Cette liste est
+déclarative ; les constats corrigés sont étayés séparément par la comparaison.
+Le débogage refuse de se terminer avec le même audit, des sources inchangées ou
+un protocole différent. Une vérification partielle ou un outil indisponible reste
+visible ; il n’est pas converti en correction réussie.
+
+En MCP, utiliser `get_debugging_plan` après la fin de l’audit initial en mode debug,
+puis `finish_debugging` après les corrections et le nouvel audit. Le skill commun
+orchestre ces étapes avec les outils d’édition de l’agent. Un exercice qui doit
+rester volontairement cassé, comme Traverse, reste en mode Audit.
+
 Lancer le serveur avec `node /chemin/absolu/labo-ux/dist/packages/mcp-server/src/index.js`.
 Le transport est stdio ; stdout est réservé au protocole. Exemple de configuration :
 
@@ -168,6 +226,17 @@ respecter AbortSignal ; un délai JavaScript ne préempte pas une boucle CPU syn
 
 Les rapports et traces peuvent contenir le contenu de l’instance de test. Ils
 restent locaux et sont exclus de Git ; aucun résultat n’est envoyé à un modèle.
+
+### Exercice Next.js Traverse
+
+`labo-ux-demos/exercices/traverse` propose un exercice court, uniquement cassé,
+avec consigne apprenant, prompt, inventaire des défauts et qualification réelle.
+Le contrôle `performance.inspect-resources` documente les images et leurs headers.
+Le contrôle `a11y.scan-journey-states` analyse les checkpoints explicitement placés
+dans les parcours, jusqu’au dernier checkpoint ; `friction.run-journey` garde la
+responsabilité de vérifier les assertions finales. Ces contrôles sont indépendants
+et consultables via `checks list` / MCP `list_checks`. Ils ne remplacent pas les
+tests manuels et ne promettent pas de retrouver tous les défauts UX.
 
 Documentation : [architecture](docs/architecture.md), [compatibilité](docs/compatibility.md),
 [lots restants](docs/roadmap.md), [format des parcours et événements](docs/formats.md).

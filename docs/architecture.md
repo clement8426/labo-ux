@@ -63,5 +63,5 @@ deltas. Cela ne prouve pas que l’environnement physique est identique. Une
 disparition de constat dans un nœud non exécuté n’est pas une correction.
 
 Les distributions locales reprennent les conventions documentées pour les
-[plugins Codex](https://developers.openai.com/api/docs/guides/agents-api/tools/plugins)
+[plugins ChatGPT et Codex](https://developers.openai.com/plugins/build/plugins)
 et les [plugins Claude](https://code.claude.com/docs/en/plugins-reference).

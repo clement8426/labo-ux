@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import type { Browser, Page, Locator } from 'playwright-core';
 import { OutputSchema, type Plan, type Target, type Action, type Output, type Evidence, type Finding } from '../../../contracts/src/index.js';
+import { resourceDiagnostics, lighthouseDiagnostics, type ResourceObservation } from './diagnostics.js';
 
 let browser: Browser | undefined, cancelled = false;
 let chromeProcess: { kill: () => void | Promise<unknown> } | undefined;
@@ -44,6 +45,15 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } }), page = await context.newPage();
   page.setDefaultTimeout(8000); page.setDefaultNavigationTimeout(20000);
   const url = safeUrl(undefined, target.baseUrl!);
+  const responses: ResourceObservation[] = [], pendingResponses: Promise<void>[] = [];
+  if (task === 'resources') page.on('response', response => {
+    const pending = (async () => {
+      const headers = await response.allHeaders();
+      responses.push({ url: response.url(), type: response.request().resourceType(), status: response.status(), cacheControl: headers['cache-control'] ?? '', contentType: headers['content-type'] ?? '',
+        encodedBodySize: /^\d+$/.test(headers['content-length'] ?? '') ? Number(headers['content-length']) : null, transferSize: null, durationMs: null });
+    })();
+    pendingResponses.push(pending);
+  });
   await page.goto(url, { waitUntil: 'load' });
   const tools = { playwright: require('playwright/package.json').version, browser: browser.version() };
   if (task === 'journeys') {
@@ -77,6 +87,61 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
         evidence.push({ id: `${j.id}-trace`, kind: 'runtime-observation', summary: 'Trace Playwright du parcours', artifact: `${j.id}-trace.zip` });
       }
     }
+  } else if (task === 'axe-states') {
+    const journeys = plan.journeys.filter(j => j.targetId === target.id && j.steps.some(s => s.action === 'checkpoint'));
+    if (!journeys.length) return OutputSchema.parse({ executionStatus: 'partial', limitations: ['Aucun checkpoint dans les parcours : aucun état supplémentaire analysé. Ajouter des checkpoints explicites pour demander une analyse axe de ces états.'], toolVersions: tools });
+    const { default: AxeBuilder } = await import(optionalModules.axe);
+    let scanned = 0;
+    for (const journey of journeys) {
+      if (journey.mutatesData && !plan.permissions.dataMutation) { limitations.push(`${journey.id} : mutation non autorisée, parcours non lancé`); continue; }
+      if (journey.steps.some(s => ['launch-app', 'open-deep-link', 'set-orientation', 'background-app', 'foreground-app', 'handle-permission'].includes(s.action))) { limitations.push(`${journey.id} : actions natives non prises en charge, parcours non lancé`); continue; }
+      const c = await browser.newContext({ viewport: { width: 1280, height: 900 } }), p = await c.newPage();
+      p.setDefaultTimeout(8000); p.setDefaultNavigationTimeout(20000);
+      let stepIndex = 0, journeyScanned = 0;
+      const expectedCheckpoints = journey.steps.filter(s => s.action === 'checkpoint').length;
+      try {
+        await p.goto(url);
+        for (const step of journey.steps) {
+          if (cancelled) throw new Error('CANCELLED');
+          stepIndex++;
+          if (step.action !== 'checkpoint') { await act(p, step, url); continue; }
+          const id = `${journey.id}-${stepIndex}`, result = await new AxeBuilder({ page: p }).analyze();
+          await writeFile(join(artifactDir, `${id}.axe.json`), JSON.stringify(result, null, 2));
+          await p.screenshot({ path: join(artifactDir, `${id}.png`), fullPage: true });
+          evidence.push({ id, kind: 'measurement', summary: `${journey.name}, checkpoint ${stepIndex} : ${result.violations.length} règle(s) axe en violation, ${result.incomplete.length} à revoir`, artifact: `${id}.axe.json` });
+          evidence.push({ id: `${id}-screen`, kind: 'runtime-observation', summary: 'État réellement analysé', artifact: `${id}.png` });
+          for (const violation of result.violations) findings.push({ id: `${id}.${violation.id}`, title: violation.help, description: `${journey.name}, checkpoint ${stepIndex} : ${violation.description} (${violation.nodes.length} élément(s))`, recommendation: `Consulter ${violation.helpUrl} et les sélecteurs de cette preuve.`, severity: violation.impact === 'critical' ? 'critical' : violation.impact === 'serious' ? 'major' : 'minor', confidence: 'confirmed', evidenceIds: [id, `${id}-screen`] });
+          scanned++;
+          journeyScanned++;
+          if (journeyScanned === expectedCheckpoints) break;
+        }
+      } catch (error) { if (cancelled) throw error; limitations.push(`${journey.id} : parcours arrêté à l’étape ${stepIndex}, les checkpoints suivants ne sont pas couverts (${String(error)})`); }
+      finally { await c.close(); }
+    }
+    limitations.push(`${scanned} état(s) explicitement analysé(s). Chaque parcours est rejoué jusqu’à son dernier checkpoint avec ses permissions ; un arrêt avant ce point laisse les checkpoints suivants non couverts. Les assertions finales relèvent du contrôle friction.run-journey. Aucun contrôle manuel clavier ou lecteur d’écran n’est remplacé.`);
+    return OutputSchema.parse({ executionStatus: limitations.some(l => /non autorisée|non lancé|arrêté/.test(l)) || !scanned ? 'partial' : 'completed', findings, evidence, limitations, toolVersions: tools });
+  } else if (task === 'resources') {
+    await Promise.all(pendingResponses);
+    const timings = await page.evaluate(() => performance.getEntriesByType('resource').map(entry => {
+      const e = entry as PerformanceResourceTiming;
+      return { url: e.name, encodedBodySize: e.encodedBodySize, transferSize: e.transferSize, durationMs: e.duration };
+    }));
+    // Preserve individual response observations, including repeated requests.
+    const remaining = [...timings];
+    for (const response of responses) {
+      const index = remaining.findIndex(t => t.url === response.url);
+      const timing = index < 0 ? undefined : remaining.splice(index, 1)[0];
+      if (timing) {
+        if (timing.encodedBodySize > 0) response.encodedBodySize = timing.encodedBodySize;
+        response.transferSize = timing.transferSize > 0 ? timing.transferSize : null;
+        response.durationMs = timing.durationMs;
+      }
+    }
+    const images = await page.locator('img').evaluateAll(elements => elements.map(element => { const img = element as HTMLImageElement; return { url: img.currentSrc || img.src, naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight, displayedWidth: img.getBoundingClientRect().width, displayedHeight: img.getBoundingClientRect().height, loading: img.loading || 'auto', widthAttribute: img.getAttribute('width'), heightAttribute: img.getAttribute('height') }; }));
+    await writeFile(join(artifactDir, 'resources.json'), JSON.stringify({ pageUrl: url, viewport: { width: 1280, height: 900 }, responses, images }, null, 2));
+    const diagnostics = resourceDiagnostics(responses, url);
+    return OutputSchema.parse({ ...diagnostics, evidence: [{ id: 'resources', kind: 'measurement', summary: `${responses.length} réponse(s) observée(s), ${images.length} image(s) dans le DOM`, artifact: 'resources.json' }], toolVersions: tools,
+      limitations: ['Chargement initial, cache navigateur neuf, sans défilement ni interaction. Tailles inconnues conservées comme inconnues ; aucune simulation de réseau dans ce contrôle. Les headers ne prouvent pas l’absence de cache serveur. Aucun défaut déduit du seul format PNG ou de dimensions HTML absentes.'] });
   } else if (task === 'axe') {
     const { default: AxeBuilder } = await import(optionalModules.axe);
     const result = await new AxeBuilder({ page }).analyze();
@@ -103,7 +168,7 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
       const result = await lighthouse(url, { port: chrome.port, output: 'json', onlyCategories: ['performance'], logLevel: 'error' });
       if (!result || result.lhr.runtimeError) throw new Error(`Lighthouse : ${result?.lhr.runtimeError?.message ?? 'résultat absent'}`);
       await writeFile(join(artifactDir, 'lighthouse.json'), typeof result.report === 'string' ? result.report : JSON.stringify(result.lhr));
-      return OutputSchema.parse({ measurements: ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index'].flatMap(name => {
+      return OutputSchema.parse({ findings: lighthouseDiagnostics(result.lhr), measurements: ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index'].flatMap(name => {
         const a = result.lhr.audits[name]; return typeof a?.numericValue === 'number' ? [{ name, value: a.numericValue, unit: a.numericUnit ?? 'unknown', context: { source: 'Lighthouse lab', url, formFactor: result.lhr.configSettings.formFactor, profile: target.buildProfile } }] : [];
       }), evidence: [{ id: 'lighthouse', kind: 'measurement', summary: `Lighthouse ${result.lhr.lighthouseVersion} ; mesures de laboratoire individuelles`, artifact: 'lighthouse.json' }], toolVersions: { ...tools, lighthouse: result.lhr.lighthouseVersion }, limitations: ['Une seule mesure sur la page d’entrée, selon le profil Lighthouse enregistré dans le JSON. Aucun résultat natif ni mesure terrain. États d’attente et double soumission non vérifiés.'] });
     } finally { await chrome.kill(); chromeProcess = undefined; }

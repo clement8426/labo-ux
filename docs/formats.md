@@ -12,6 +12,11 @@ caractère mutateur. Le pilote web accepte `open-target`, `open-url`, `activate`
 `expect-state` et `checkpoint`. Une étape d’action ne prouve que l’action a été
 effectuée ; ajouter une assertion explicite pour vérifier son résultat.
 
+`checkpoint` produit une capture dans `friction.run-journey`. Le contrôle distinct
+`a11y.scan-journey-states` rejoue les parcours jusqu’à leur dernier checkpoint et
+y lance axe. Les actions peuvent donc être exécutées une nouvelle fois dans un
+contexte isolé ; déclarer les mutations et employer uniquement des données de test.
+
 Les sélecteurs sont un `testId`, un rôle avec son nom accessible, ou un texte exact.
 Pas de JavaScript arbitraire, CSS libre ou coordonnées fixes. Les URL sont limitées
 à l’origine déclarée pour la navigation explicite du parcours. Une redirection

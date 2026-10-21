@@ -22,6 +22,8 @@ it('expose le même catalogue et exécute un audit via MCP sans polluer stdout',
     let status: any;
     for (let i = 0; i < 100; i++) { status = parse(await client.callTool({ name: 'get_audit_status', arguments: { runId: started.runId, outputDir } })); if (status.state.status !== 'running') break; await new Promise(r => setTimeout(r, 20)); }
     expect(status.state.status).toBe('partial'); expect(status.completedNodes).toBe(cli.length);
+    expect(status.state.plan.mode).toBe('audit'); expect(status.state.plan.permissions.codeModification).toBe(false);
+    expect((await client.callTool({name:'get_debugging_plan',arguments:{runId:started.runId,outputDir}})).isError).toBe(true);
     const result = parse(await client.callTool({ name: 'get_audit_results', arguments: { runId: started.runId, outputDir, block: 'microcopy' } }));
     expect(result.results.every((r: any) => r.block === 'microcopy')).toBe(true); expect(result.results.some((r: any) => r.findings.length)).toBe(true);
     const bad = await client.callTool({ name: 'get_audit_evidence', arguments: { runId: started.runId, outputDir, artifact: '../../run.json' } }); expect(bad.isError).toBe(true);
