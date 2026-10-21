@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.3.0 — 2026-10-21
+
+- Export PDF client autonome, version HTML imprimable, bouton dans le rapport,
+  commande `export-pdf` et outil MCP `export_audit_pdf`. Regroupement explicite
+  des constats répétés, preuves, captures sélectionnées et limites conservées.
+- Lighthouse : quatre catégories dans le rapport officiel HTML, JSON et capture
+  du rapport. Les mesures de performance restent distinctes ; règle 1.2.0.
+- Diagnostics CDP indépendants : réseau/cache à froid et au rechargement,
+  instantanés mémoire/DOM, en-têtes de sécurité et erreurs navigateur. Aucun
+  test de fuite ni pentest annoncé. Inventaire heuristique du cache dans le code.
+- Section `technical` complémentaire aux six blocs UX. Contrôles en panne isolés,
+  preuves persistées et compatibilité des anciens rapports conservées.
+- Tests unitaires de regroupement, échappement et limites ; test navigateur réel
+  des diagnostics et des exports PDF par HTTP et CLI.
+
 ## 0.2.0 — 2026-10-21
 
 - PROMPT.md autonome pour l’installation par un agent, script setup et audit réel

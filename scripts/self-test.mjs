@@ -23,6 +23,12 @@ try{
   for(const id of['a11y.scan-screen','a11y.scan-journey-states','friction.run-journey','performance.inspect-resources','performance.measure-web-load','behavior.compute-funnel'])assert.equal(report.results.find(r=>r.nodeId===id)?.executionStatus,'completed',`${id} réellement exécuté`);
   assert.ok(report.results.find(r=>r.nodeId==='a11y.scan-screen').findings.some(f=>f.id==='image-alt'),'Image volontairement sans alternative détectée');
   assert.equal(report.results.find(r=>r.nodeId==='friction.run-journey').findings.length,0,'Confirmation fictive atteinte');
+  const lighthouse=report.results.find(r=>r.nodeId==='performance.measure-web-load');
+  for(const name of['lighthouse.json','lighthouse.html','lighthouse-report.png']){
+    const proof=lighthouse.evidence.find(e=>e.artifact?.endsWith(name));assert.ok(proof,`Preuve Lighthouse ${name}`);
+    const data=await readFile(join(raw.outputDir,run.state.id,'evidence',proof.artifact));assert.ok(data.length>100,`Preuve non vide ${name}`);
+    if(name.endsWith('.png'))assert.equal(data.subarray(0,8).toString('hex'),'89504e470d0a1a0a','Capture PNG réelle');
+  }
   assert.equal(await readFile(join(project,'index.html'),'utf8'),html,'Code de la fixture inchangé');
   const result={status:'passed',testedAt:new Date().toISOString(),runId:run.state.id,outputDir:raw.outputDir,report:reportPath,mode:'audit',codeModified:false};
   await writeFile(join(folder,'latest.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));

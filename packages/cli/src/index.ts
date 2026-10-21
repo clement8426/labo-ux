@@ -12,6 +12,7 @@ import { discoverTargets, adapterCatalog, capabilitiesFor, snapshotForPlan } fro
 import { targetSnapshot } from '../../adapters/source/src/index.js';
 import { suggestions } from '../../profiles/src/index.js';
 import { serveReport } from '../../reports/src/server.js';
+import { exportClientPdf } from '../../reports/src/pdf.js';
 
 const print = (v: unknown): void => { process.stdout.write(JSON.stringify(v, null, 2) + '\n'); };
 const program = new Command().name('labo-ux').version(kitVersion).description('Kit modulaire d’audit UX, sans modèle IA obligatoire');
@@ -63,6 +64,11 @@ savedCommand('resume', 'Reprendre après vérification des versions et sources')
   finally { process.removeListener('SIGINT', cancel); }
 });
 savedCommand('report', 'Régénérer les rapports depuis les résultats enregistrés').action(async (id, opts) => print(await writeReports(new Store(opts.output), id)));
+savedCommand('export-pdf', 'Créer un PDF client autonome à partir des résultats, sans relancer l’audit').option('--client <name>', 'Nom du client').option('--author <name>', 'Auteur du rapport').option('--title <text>', 'Titre du rapport').action(async (id, opts) => {
+  const store = new Store(opts.output); await store.state(id);
+  const reports = await writeReports(store, id); if (reports.errors.length) throw new Error(reports.errors.join('; '));
+  print(await exportClientPdf(store.dir(id), { client: opts.client, author: opts.author, title: opts.title }));
+});
 savedCommand('serve-report', 'Afficher un rapport local dans le navigateur, sans nouvelle analyse').option('--port <port>', 'Port local', '4193').action(async(id,opts)=>{
   const port=Number(opts.port);if(!Number.isInteger(port)||port<1||port>65535)throw new Error('Port invalide');
   const store=new Store(opts.output);await store.state(id);const reports=await writeReports(store,id);if(reports.errors.length)throw new Error(reports.errors.join('; '));

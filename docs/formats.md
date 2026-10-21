@@ -4,6 +4,16 @@ Les schémas exécutables font autorité : `packages/contracts/src/index.ts`.
 La configuration de la fixture est un exemple complet :
 `fixtures/web-showcase/audit.json`.
 
+`blocks` accepte les six blocs UX habituels et la section complémentaire
+`technical`, incluse par défaut dans les nouveaux plans. Un plan qui fournit
+explicitement ses six blocs reste limité à ceux-ci. Les résultats techniques
+ont `block: technical` ; ils ne créent pas un septième bloc UX.
+
+Les fichiers `client.pdf` et `client.html` sont des exports facultatifs générés
+depuis les résultats. Le PDF embarque au plus huit captures valides du dossier
+evidence (5 Mo chacune, 20 Mo au total). Les preuves manquantes restent référencées
+dans le texte ; les résultats et erreurs ne sont jamais transformés en succès.
+
 ## Parcours
 
 Chaque parcours nomme sa cible, ses préconditions, un objectif observable et son

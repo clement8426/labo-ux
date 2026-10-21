@@ -1,14 +1,49 @@
 # Labo UX
 
 Kit d’audit UX modulaire en TypeScript, avec CLI, serveur MCP local et skill commun
-aux distributions locales Codex et Claude. Version **0.2.0** : modes audit/débogage,
-rapport visuel autonome et installation guidée par l’agent. Le plan complet n’est pas encore
+aux distributions locales Codex et Claude. Version **0.3.0** : diagnostics navigateur,
+rapport Lighthouse illustré et PDF client, en plus des modes audit/débogage et de
+l’installation guidée par l’agent. Le plan complet n’est pas encore
 livré ; voir [l’état des lots](docs/roadmap.md) et [la compatibilité](docs/compatibility.md).
 
 Le moteur travaille sans modèle IA. Une vérification en panne ou indisponible
 laisse les autres continuer. Les constats du produit sont distincts des erreurs
 d’outils. Les résultats sont enregistrés après chaque nœud et les rapports JSON,
 Markdown et HTML restent consultables pour les audits partiels.
+
+## Rapport pour un client
+
+Dans le rapport servi par `serve-report`, **PDF client** crée un document A4
+autonome : synthèse, périmètre, constats et recommandations point par point,
+références de preuves, sélection de captures et limites. Aucun audit n’est relancé.
+Playwright et Chromium sont nécessaires à cet export ; s’ils manquent, l’HTML et
+les preuves restent disponibles. Utiliser le bouton depuis le serveur local ou
+après un export explicite ; un HTML ouvert seul ne peut pas lancer Node.
+
+```sh
+node dist/packages/cli/src/index.js export-pdf <runId> --output <dossier-des-audits> --client "Nom du client" --author "Votre agence"
+```
+
+L’agent dispose aussi de `export_audit_pdf` en MCP. Le PDF et son HTML imprimable
+sont enregistrés dans le dossier de cet audit (`client.pdf`, `client.html`).
+Les constats de même titre/cible/bloc/confiance sont regroupés avec leurs preuves ;
+cela ne prouve pas une cause unique. Le document embarque au plus 8 captures,
+5 Mo par image et 20 Mo au total. Les preuves brutes restent séparées.
+
+Lighthouse conserve son JSON, son **rapport HTML officiel** et une capture de ce
+rapport si le rendu réussit. Les catégories performance, accessibilité, bonnes
+pratiques et SEO portent sur une page d’entrée. Leurs scores ne constituent ni
+un score UX ni une certification de sécurité.
+
+La section **Diagnostics techniques complémentaires** reste distincte des six
+blocs UX : réseau/cache à froid et au rechargement, instantanés du tas JavaScript
+et du DOM, en-têtes de sécurité et erreurs navigateur, indices de cache dans les
+sources. `technical` est sélectionné par défaut dans un nouveau plan ; l’omettre
+de `blocks` limite le périmètre aux six blocs UX. Un ancien plan à six blocs est
+respecté. Tous les panneaux DevTools ne sont pas reproduits : heap snapshots,
+tests de fuite, traces CPU détaillées, audits de droits et pentests ne sont pas
+implémentés. Les données réseau sont réduites et les URLs y perdent leurs
+paramètres ; relire les messages techniques bruts avant de partager ce dossier.
 
 Les applications pédagogiques sont dans le dépôt séparé
 [labo-ux-demos](https://github.com/clement8426/labo-ux-demos). Il propose

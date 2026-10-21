@@ -1,11 +1,11 @@
 import { writeFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { blocks, type Result, type RunState } from '../../contracts/src/index.js';
+import { blocks, reportSections, type Result, type RunState } from '../../contracts/src/index.js';
 import { Store } from '../../core/src/store.js';
 import { renderHtml } from './html.js';
 export type Report = { schemaVersion: '1'; state: RunState; results: Result[]; limitations: string[] };
-export const blockNames = { 'design-system': 'Cohérence des composants', friction: 'Frictions et parcours', accessibility: 'Accessibilité', behavior: 'Données comportementales', microcopy: 'Microcopie', performance: 'Performances' };
-const findingNames: Record<string, string> = { 'button-name': 'Bouton sans nom accessible', 'image-alt': 'Images sans alternative textuelle', 'html-has-lang': 'Langue du document absente', 'color-contrast': 'Contrastes insuffisants', 'landmark-one-main': 'Repère principal absent', region: 'Contenu en dehors des repères' };
+export const blockNames = { 'design-system': 'Cohérence des composants', friction: 'Frictions et parcours', accessibility: 'Accessibilité', behavior: 'Données comportementales', microcopy: 'Microcopie', performance: 'Performances', technical: 'Diagnostics techniques complémentaires' };
+export const findingNames: Record<string, string> = { 'button-name': 'Bouton sans nom accessible', 'image-alt': 'Images sans alternative textuelle', 'html-has-lang': 'Langue du document absente', 'color-contrast': 'Contrastes insuffisants', 'landmark-one-main': 'Repère principal absent', region: 'Contenu en dehors des repères' };
 const modeText = (report: Report) => report.state.plan.mode === 'debug' ? 'Débogage — audit initial avant corrections. L’agent hôte doit lire les preuves, corriger puis lancer un nouvel audit.' : 'Audit — lecture et tests autorisés, sans réécriture du code. Le moteur écrit uniquement ses résultats et preuves.';
 export function summarize(report: Report) {
   const priorities = new Map<string, { title: string; targetId: string; nodeId: string; severity: string; confidence: string; recommendation: string }>();
@@ -52,7 +52,7 @@ export function markdown(report: Report): string {
   for (const status of ['completed', 'partial', 'error', 'timed-out', 'skipped', 'not-applicable', 'cancelled']) lines.push(`- ${status} : ${results.filter(r => r.executionStatus === status).length}`);
   for (const t of state.plan.targets) {
     lines.push('', `## Cible ${t.id} (${t.kind})`, '');
-    for (const block of blocks) {
+    for (const block of reportSections) {
       lines.push(`### ${block}`, '');
       const selected = results.filter(r => r.targetId === t.id && r.block === block);
       if (!selected.length) lines.push('Aucun contrôle enregistré pour cette sélection.', '');

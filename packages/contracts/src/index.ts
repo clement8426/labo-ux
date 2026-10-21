@@ -1,8 +1,10 @@
 import { z } from 'zod';
 
 export const schemaVersion = '1' as const;
-export const kitVersion = '0.2.0' as const;
+export const kitVersion = '0.3.0' as const;
 export const blocks = ['design-system', 'friction', 'accessibility', 'behavior', 'microcopy', 'performance'] as const;
+// Les diagnostics techniques complètent les six blocs UX sans en devenir un septième.
+export const reportSections = [...blocks, 'technical'] as const;
 export const targetKinds = ['web', 'android', 'ios', 'webview'] as const;
 export const executionStatuses = ['completed', 'partial', 'error', 'timed-out', 'skipped', 'not-applicable', 'cancelled'] as const;
 export const evidenceKinds = ['measurement', 'runtime-observation', 'source-analysis', 'ai-assessment'] as const;
@@ -35,7 +37,7 @@ export const PlanSchema = z.object({
   mode: z.enum(['audit', 'debug']).default('audit'),
   usage: z.enum(['showcase', 'content', 'ecommerce', 'saas', 'business-app', 'custom']).default('custom'),
   objective: z.string().default('Identifier les obstacles UX'), confirmed: z.boolean().default(false),
-  targets: z.array(TargetSchema).min(1), blocks: z.array(z.enum(blocks)).default([...blocks]),
+  targets: z.array(TargetSchema).min(1), blocks: z.array(z.enum(reportSections)).default([...reportSections]),
   checks: z.array(z.string()).optional(), journeys: z.array(JourneySchema).default([]),
   behavior: z.object({ file: z.string(), steps: z.array(z.string().min(1)).min(2).max(100), windowMs: z.number().positive().default(1800000) }).optional(),
   permissions: z.object({ runtime: z.boolean().default(false), dataMutation: z.boolean().default(false), codeModification: z.boolean().default(false) }).default({ runtime: false, dataMutation: false, codeModification: false }),
@@ -60,7 +62,7 @@ export const OutputSchema = z.object({
   for (const f of v.findings) if (f.evidenceIds.some(id => !ids.has(id))) ctx.addIssue({ code: 'custom', message: `Preuve introuvable : ${f.id}` });
 });
 export const ResultSchema = z.object({
-  schemaVersion: z.literal(schemaVersion), runId: z.string(), nodeId: z.string(), nodeVersion: z.string(), targetId: z.string(), block: z.enum(blocks),
+  schemaVersion: z.literal(schemaVersion), runId: z.string(), nodeId: z.string(), nodeVersion: z.string(), targetId: z.string(), block: z.enum(reportSections),
   executionStatus: z.enum(executionStatuses), durationMs: z.number().nonnegative(),
   findings: z.array(FindingSchema), measurements: z.array(MeasurementSchema), evidence: z.array(EvidenceSchema), limitations: z.array(z.string()),
   error: z.string().optional(), toolVersions: z.record(z.string(), z.string()),
@@ -75,7 +77,7 @@ export type Evidence = z.infer<typeof EvidenceSchema>;
 export type Finding = z.infer<typeof FindingSchema>;
 export type Output = z.infer<typeof OutputSchema>;
 export type Result = z.infer<typeof ResultSchema>;
-export type Block = typeof blocks[number];
+export type Block = typeof reportSections[number];
 export type Capability = { id: string; available: boolean; reason: string; version?: string };
 export type SourceFile = { path: string; content: string };
 export type Snapshot = { files: SourceFile[]; fingerprint: string; limitations: string[] };

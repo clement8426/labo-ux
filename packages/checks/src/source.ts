@@ -20,6 +20,13 @@ function scan(ctx: Context, pattern: RegExp, title: string, recommendation: stri
   return result;
 }
 export const sourceChecks = [
+  define('technical.inspect-cache-source', 'technical', async ctx => {
+    const evidence = ctx.snapshot.files.filter(f => /\.(?:[cm]?[jt]sx?|json|conf|ya?ml|php|py|rb|go|java|kt|swift|dart)$/.test(f.path))
+      .flatMap(f => [...f.content.matchAll(/(?:cache-control|\brevalidate\b|\bredis\b|force-cache|no-store|stale-while-revalidate|s-maxage)/gi)]
+        .slice(0, 30).map(m => ({ id: `cache-${createHash('sha256').update(`${f.path}:${m.index}`).digest('hex').slice(0, 16)}`, kind: 'source-analysis' as const,
+          summary: `Motif ${m[0]} repéré ; configuration et usage effectif à examiner.`, file: f.path, line: lineOf(f.content, m.index!) }))).slice(0, 150);
+    return output({ executionStatus: 'partial', evidence, limitations: ['Inventaire heuristique du code disponible, sans exécution des accès au cache serveur. La présence de Redis ou d’une directive ne prouve ni son activation ni son efficacité. Aucun motif trouvé ne signifie pas absence de cache.'] });
+  }),
   define('design.collect-tokens', 'design-system', async ctx => {
     const values = new Map<string, { file: string; line: number }[]>();
     for (const f of ctx.snapshot.files.filter(f => /\.(html?|css|scss|tsx?|jsx?|vue|svelte|dart|swift|kt)$/.test(f.path))) {

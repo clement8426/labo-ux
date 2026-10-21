@@ -10,13 +10,16 @@ export const checks = [
     ['friction.run-journey', 'friction', 'journeys', ['runtime.browser']],
     ['a11y.scan-journey-states', 'accessibility', 'axe-states', ['runtime.browser', 'audit.axe']],
     ['performance.inspect-resources', 'performance', 'resources', ['runtime.browser']],
+    ['technical.inspect-network', 'technical', 'network', ['runtime.browser']],
+    ['technical.measure-memory', 'technical', 'memory', ['runtime.browser']],
+    ['technical.inspect-security', 'technical', 'security', ['runtime.browser']],
     ['performance.measure-web-load', 'performance', 'lighthouse', ['runtime.browser', 'audit.lighthouse']]
   ] as const).map(([id, block, task, required]) => define(id, block, ctx => isolatedWebTask(task, ctx), {
     supportedTargets: ['web', 'webview'], requiredCapabilities: [...required],
     resourceRequirements: task === 'lighthouse' ? ['exclusive'] : ['browser'],
-    retryPolicy: { maxAttempts: 1, transientErrors: [], idempotent: !['journeys', 'axe-states'].includes(task) },
+    retryPolicy: { maxAttempts: task === 'lighthouse' ? 2 : 1, transientErrors: task === 'lighthouse' ? ['fetch browser webSocket URL', 'ECONNREFUSED'] : [], idempotent: !['journeys', 'axe-states'].includes(task) },
     timeoutMs: task === 'axe-states' ? 180000 : task === 'lighthouse' ? 120000 : 60000,
-    version: task === 'lighthouse' ? '1.1.0' : '1.0.0'
+    version: task === 'lighthouse' ? '1.2.0' : '1.0.0'
   })),
   define('a11y.native-audit', 'accessibility', async () => { throw new Error('Audit natif non livré ; aucune mesure produite'); }, { supportedTargets: ['android', 'ios'], requiredCapabilities: ['audit.native-accessibility'], resourceRequirements: ['device'] }),
   define('performance.measure-startup', 'performance', async () => { throw new Error('Mesure native non livrée ; aucune mesure produite'); }, { supportedTargets: ['android', 'ios'], requiredCapabilities: ['performance.native'], resourceRequirements: ['device', 'exclusive'] })

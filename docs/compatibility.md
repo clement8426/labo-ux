@@ -1,4 +1,15 @@
-# Compatibilité de la version 0.2
+# Compatibilité de la version 0.3
+
+Diagnostics techniques complémentaires : CDP dans Chromium pour réseau/cache
+sur deux chargements, mémoire JavaScript/DOM ponctuelle et observation passive
+des en-têtes/erreurs. Inventaire du cache dans le code accessible. Aucun heap
+snapshot, test de fuite ou pentest. Ces diagnostics ne remplacent pas tous les
+panneaux Chrome DevTools et ne sont pas des contrôles d’application native.
+
+Rapport Lighthouse HTML/JSON et capture sur la page d’entrée. Export PDF A4
+client via serveur local, CLI ou MCP ; nécessite Playwright et Chromium. Export
+depuis des résultats sauvegardés sans nouvelle mesure. Captures incorporées en
+nombre/taille limités, traces et preuves brutes conservées à part.
 
 ## Web
 

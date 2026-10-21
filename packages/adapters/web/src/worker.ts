@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import type { Browser, Page, Locator } from 'playwright-core';
 import { OutputSchema, type Plan, type Target, type Action, type Output, type Evidence, type Finding } from '../../../contracts/src/index.js';
 import { resourceDiagnostics, lighthouseDiagnostics, type ResourceObservation } from './diagnostics.js';
+import { browserDiagnostics } from './browser-diagnostics.js';
 
 let browser: Browser | undefined, cancelled = false;
 let chromeProcess: { kill: () => void | Promise<unknown> } | undefined;
@@ -45,6 +46,8 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } }), page = await context.newPage();
   page.setDefaultTimeout(8000); page.setDefaultNavigationTimeout(20000);
   const url = safeUrl(undefined, target.baseUrl!);
+  const tools = { playwright: require('playwright/package.json').version, browser: browser.version() };
+  if (['network', 'memory', 'security'].includes(task)) return browserDiagnostics(task, context, page, url, artifactDir, tools);
   const responses: ResourceObservation[] = [], pendingResponses: Promise<void>[] = [];
   if (task === 'resources') page.on('response', response => {
     const pending = (async () => {
@@ -55,7 +58,6 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
     pendingResponses.push(pending);
   });
   await page.goto(url, { waitUntil: 'load' });
-  const tools = { playwright: require('playwright/package.json').version, browser: browser.version() };
   if (task === 'journeys') {
     const journeys = plan.journeys.filter(j => j.targetId === target.id);
     if (!journeys.length) return OutputSchema.parse({ executionStatus: 'partial', limitations: ['Aucun parcours configuré.'], toolVersions: tools });
@@ -165,12 +167,31 @@ async function run(task: string, plan: Plan, target: Target, artifactDir: string
     const chrome = await launch({ chromePath: chromium.executablePath(), chromeFlags: ['--headless', '--no-first-run'] });
     chromeProcess = chrome;
     try {
-      const result = await lighthouse(url, { port: chrome.port, output: 'json', onlyCategories: ['performance'], logLevel: 'error' });
+      const result = await lighthouse(url, { port: chrome.port, output: ['json', 'html'], onlyCategories: ['performance', 'accessibility', 'best-practices', 'seo'], logLevel: 'error' });
       if (!result || result.lhr.runtimeError) throw new Error(`Lighthouse : ${result?.lhr.runtimeError?.message ?? 'résultat absent'}`);
-      await writeFile(join(artifactDir, 'lighthouse.json'), typeof result.report === 'string' ? result.report : JSON.stringify(result.lhr));
-      return OutputSchema.parse({ findings: lighthouseDiagnostics(result.lhr), measurements: ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index'].flatMap(name => {
+      await writeFile(join(artifactDir, 'lighthouse.json'), JSON.stringify(result.lhr));
+      const reports = Array.isArray(result.report) ? result.report : [result.report];
+      const reportHtml = reports.find((value: string) => /^\s*(?:<!--[\s\S]*?-->\s*)*(?:<!doctype\s+html\b|<html\b)/i.test(value));
+      const lighthouseEvidence: Evidence[] = [{ id: 'lighthouse', kind: 'measurement', summary: `Lighthouse ${result.lhr.lighthouseVersion} ; mesures de laboratoire individuelles`, artifact: 'lighthouse.json' }];
+      const captureLimitations: string[] = [];
+      if (reportHtml) {
+        await writeFile(join(artifactDir, 'lighthouse.html'), reportHtml);
+        lighthouseEvidence.push({ id: 'lighthouse-html', kind: 'measurement', summary: 'Rapport Lighthouse officiel interactif : performance, accessibilité, bonnes pratiques et SEO sur la page d’entrée.', artifact: 'lighthouse.html' });
+        const captureBrowser = await chromium.launch({ headless: true });
+        try {
+          const captureContext = await captureBrowser.newContext({ viewport: { width: 1440, height: 1000 }, serviceWorkers: 'block' });
+          await captureContext.route('**/*', route => route.abort());
+          const capturePage = await captureContext.newPage();
+          await capturePage.setContent(reportHtml, { waitUntil: 'load' });
+          await capturePage.locator('.lh-category').first().waitFor({ timeout: 10000 });
+          await capturePage.screenshot({ path: join(artifactDir, 'lighthouse-report.png') });
+          lighthouseEvidence.push({ id: 'lighthouse-screen', kind: 'runtime-observation', summary: 'Capture du rapport Lighthouse de cette exécution, pas une capture du panneau DevTools.', artifact: 'lighthouse-report.png' });
+        } catch (error) { captureLimitations.push(`Capture Lighthouse indisponible ; rapports HTML/JSON conservés : ${String(error)}`); }
+        finally { await captureBrowser.close(); }
+      } else captureLimitations.push('Rapport Lighthouse HTML absent de la sortie de l’outil ; JSON conservé.');
+      return OutputSchema.parse({ executionStatus: captureLimitations.length ? 'partial' : 'completed', findings: lighthouseDiagnostics(result.lhr), measurements: ['first-contentful-paint', 'largest-contentful-paint', 'total-blocking-time', 'cumulative-layout-shift', 'speed-index'].flatMap(name => {
         const a = result.lhr.audits[name]; return typeof a?.numericValue === 'number' ? [{ name, value: a.numericValue, unit: a.numericUnit ?? 'unknown', context: { source: 'Lighthouse lab', url, formFactor: result.lhr.configSettings.formFactor, profile: target.buildProfile } }] : [];
-      }), evidence: [{ id: 'lighthouse', kind: 'measurement', summary: `Lighthouse ${result.lhr.lighthouseVersion} ; mesures de laboratoire individuelles`, artifact: 'lighthouse.json' }], toolVersions: { ...tools, lighthouse: result.lhr.lighthouseVersion }, limitations: ['Une seule mesure sur la page d’entrée, selon le profil Lighthouse enregistré dans le JSON. Aucun résultat natif ni mesure terrain. États d’attente et double soumission non vérifiés.'] });
+      }), evidence: lighthouseEvidence, toolVersions: { ...tools, lighthouse: result.lhr.lighthouseVersion }, limitations: ['Une seule mesure sur la page d’entrée, selon le profil Lighthouse enregistré dans le JSON. Aucun résultat natif ni mesure terrain. États d’attente et double soumission non vérifiés.', 'Les scores Lighthouse ne sont ni un score UX global ni une certification d’accessibilité ou de sécurité. Les bonnes pratiques ne constituent pas un audit de sécurité.', ...captureLimitations] });
     } finally { await chrome.kill(); chromeProcess = undefined; }
   } else throw new Error(`Tâche web inconnue : ${task}`);
   await page.screenshot({ path: join(artifactDir, 'screen.png'), fullPage: true });

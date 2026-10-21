@@ -50,6 +50,20 @@ résultats par cible/bloc. Lire les preuves utiles séparément. Une erreur ou u
 contrôle ignoré ne doit pas interrompre l’interprétation des autres résultats.
 Les fichiers de parcours décrivent des actions déclaratives, jamais du code arbitraire.
 
+La section `technical` complète les six blocs UX quand elle est sélectionnée :
+réseau/cache sur deux chargements, mémoire ponctuelle, en-têtes/erreurs navigateur
+et indices de cache dans les sources. Ne pas déduire une fuite mémoire, un cache
+Redis efficace ou la sécurité du produit de ces observations. Les rapports
+Lighthouse HTML/JSON et leur capture portent sur une page d’entrée, pas sur tous
+les parcours. Vérifier leurs états réels avant d’annoncer leur disponibilité.
+
+Pour un livrable client, utiliser `export_audit_pdf` avec runId/outputDir et,
+si fournis, client/author/title. En CLI : `export-pdf <runId> --output <dossier>`.
+Le bouton « PDF client » fonctionne dans le rapport servi par `serve-report`.
+Il exporte les résultats enregistrés, sans relancer l’audit. Fournir le PDF réel,
+ses limites et le rapport technique ; relire les preuves brutes avant partage.
+Si Chromium manque, annoncer l’export indisponible et conserver l’HTML/JSON.
+
 Restituer séparément les défauts du produit, erreurs d’outils, mesures avec unités
 et environnement, hypothèses issues du code, et contrôles restants. Un constat
 d’axe n’est pas une panne du moteur. Une absence supposée dans le code n’est pas
